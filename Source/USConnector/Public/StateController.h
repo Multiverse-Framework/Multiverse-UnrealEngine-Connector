@@ -76,6 +76,10 @@ private:
 
 	FGraphEventRef Task;
 
+	TMap<AActor*, TArray<FName>> CachedRBoneNames;
+
+	TMap<AActor*, TArray<FName>> CachedTBoneNames;
+
 private:
 	UPROPERTY(VisibleAnywhere)
 	bool IsEnable = false;

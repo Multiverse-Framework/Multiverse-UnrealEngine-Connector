@@ -4,13 +4,124 @@
 
 #include <chrono>
 
+#include "Animation/SkeletalMeshActor.h"
 #include "Engine/StaticMeshActor.h"
 #include "Json.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "StateManager.h"
+#include "USAnim.h"
 #include "ZMQLibrary/zmq.hpp"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStateController, Log, All);
+
+const TMap<EAttribute, TArray<double>> AttributeMap =
+    {
+        {EAttribute::Position, {0.0, 0.0, 0.0}},
+        {EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
+        {EAttribute::JointRvalue, {0.0}},
+        {EAttribute::JointTvalue, {0.0}},
+        {EAttribute::JointPosition, {0.0, 0.0, 0.0}},
+        {EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
+
+static void SetMetaData(TArray<TPair<AActor *, EAttribute>> &DataArray,
+                        size_t &buffer_size, TSharedPtr<FJsonObject> &MetaDataJson,
+                        const TPair<AActor *, FAttributeContainer> &Object,
+                        TMap<AActor *, TArray<FName>> &CachedRBoneNames,
+                        TMap<AActor *, TArray<FName>> &CachedTBoneNames)
+{
+    if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
+    {
+        if (UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent())
+        {
+            StaticMeshComponent->SetSimulatePhysics(false);
+        }
+
+        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+        for (const EAttribute &Attribute : Object.Value.Attributes)
+        {
+            switch (Attribute)
+            {
+            case EAttribute::Position:
+                AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+                break;
+
+            case EAttribute::Quaternion:
+                AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+                break;
+
+            default:
+                break;
+            }
+
+            DataArray.Add(TPair<AActor *, EAttribute>(Object.Key, Attribute));
+            buffer_size += AttributeMap[Attribute].Num();
+        }
+
+        FString ObjectName = Object.Key->GetActorLabel();
+        ObjectName.RemoveFromEnd(TEXT("_ref"));
+        MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
+    }
+    else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
+    {
+        if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+        {
+            if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+            {
+                TArray<FName> BoneNames;
+                SkeletalMeshComponent->GetBoneNames(BoneNames);
+                BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
+                               { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
+                CachedRBoneNames.Add(Object.Key, {});
+                for (const FName &BoneName : BoneNames)
+                {
+                    FString BoneNameStr = BoneName.ToString();
+                    if ((BoneNameStr.EndsWith(TEXT("_revolute_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_revolute_bone"))) ||
+                        (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone"))))
+                    {
+                        CachedRBoneNames[Object.Key].Add(BoneName);
+                        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+                        for (const EAttribute &Attribute : Object.Value.Attributes)
+                        {
+                            switch (Attribute)
+                            {
+                            case EAttribute::JointRvalue:
+                            {
+                                AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_rvalue"))));
+                                break;
+                            }
+                            }
+                            buffer_size += AttributeMap[Attribute].Num();
+                        }
+                        MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
+                    }
+                    else if (BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone")))
+                    {
+                        CachedTBoneNames[Object.Key].Add(BoneName);
+                        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+                        for (const EAttribute &Attribute : Object.Value.Attributes)
+                        {
+                            switch (Attribute)
+                            {
+                            case EAttribute::JointTvalue:
+                            {
+                                AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_tvalue"))));
+                                break;
+                            }
+                            }
+                            buffer_size += AttributeMap[Attribute].Num();
+                        }
+                        MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
+                    }
+                }
+
+                for (const EAttribute &Attribute : Object.Value.Attributes)
+                {
+                    DataArray.Add(TPair<AActor *, EAttribute>(Object.Key, Attribute));
+                }
+            }
+        }
+    }
+}
 
 UStateController::UStateController()
 {
@@ -30,8 +141,8 @@ UStateController::UStateController()
 
 UMaterial *UStateController::GetMaterial(const FLinearColor &Color) const
 {
-	const FString ColorName = TEXT("M_") + ColorMap[Color];
-	return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/USConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
+    const FString ColorName = TEXT("M_") + ColorMap[Color];
+    return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/USConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
 }
 
 void UStateController::Init()
@@ -62,82 +173,85 @@ void UStateController::Init()
             continue;
         }
 
-        AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(ReceiveObject.Key);
-        if (StaticMeshActor == nullptr)
+        if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(ReceiveObject.Key))
         {
-            UE_LOG(LogStateController, Warning, TEXT("Ignore Non-StaticMeshActor %s in ReceiveObjects."), *StaticMeshActor->GetName())
-            continue;
-        }
+            UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
+            if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
+            {
+                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetName())
+                continue;
+            }
+            if (!StaticMeshComponent->IsSimulatingPhysics())
+            {
+                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetName())
+                StaticMeshComponent->SetSimulatePhysics(true);
+            }
 
-        UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
-        if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
+            UMaterial *RedMaterial = GetMaterial(FLinearColor(1, 0, 0, 1));
+            for (int32 i = 0; i < StaticMeshComponent->GetMaterials().Num(); i++)
+            {
+                StaticMeshComponent->SetMaterial(i, RedMaterial);
+            }
+
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.Template = StaticMeshActor;
+            SpawnParams.Name = *(ReceiveObject.Key->GetActorLabel() + TEXT("_ref"));
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            AActor *ReceiveObjectRef = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(), SpawnParams);
+            if (ReceiveObjectRef == nullptr)
+            {
+                UE_LOG(LogStateController, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
+                continue;
+            }
+
+            ReceiveObjectRef->SetActorLabel(SpawnParams.Name.ToString());
+
+            AStaticMeshActor *StaticMeshActorRef = Cast<AStaticMeshActor>(ReceiveObjectRef);
+
+            UStaticMeshComponent *StaticMeshComponentRef = StaticMeshActorRef->GetStaticMeshComponent();
+            StaticMeshComponentRef->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            StaticMeshComponentRef->SetSimulatePhysics(false);
+
+            UMaterial *GrayMaterial = GetMaterial(FLinearColor(0.1, 0.1, 0.1, 1));
+            for (int32 i = 0; i < StaticMeshComponentRef->GetMaterials().Num(); i++)
+            {
+                StaticMeshComponentRef->SetMaterial(i, GrayMaterial);
+            }
+
+            UPhysicsConstraintComponent *PhysicsConstraint = NewObject<UPhysicsConstraintComponent>(StaticMeshActorRef);
+            PhysicsConstraint->AttachToComponent(StaticMeshComponentRef, FAttachmentTransformRules::KeepWorldTransform);
+            PhysicsConstraint->SetWorldLocation(StaticMeshActorRef->GetActorLocation());
+
+            PhysicsConstraint->ComponentName1.ComponentName = *StaticMeshActorRef->GetName();
+            PhysicsConstraint->ComponentName2.ComponentName = *StaticMeshActor->GetName();
+            PhysicsConstraint->ConstraintActor1 = StaticMeshActorRef;
+            PhysicsConstraint->ConstraintActor2 = StaticMeshActor;
+            PhysicsConstraint->ConstraintInstance.Pos1 = FVector();
+            PhysicsConstraint->ConstraintInstance.Pos2 = FVector();
+
+            PhysicsConstraint->SetConstrainedComponents(StaticMeshComponentRef, NAME_None, StaticMeshComponent, NAME_None);
+
+            // Enable linear constraint in all axes
+            PhysicsConstraint->SetLinearXLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
+            PhysicsConstraint->SetLinearYLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
+            PhysicsConstraint->SetLinearZLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
+            // PhysicsConstraint->ConstraintInstance.ProfileInstance.LinearLimit.bSoftConstraint = true;
+
+            // Enable angular constraint in all axes
+            PhysicsConstraint->SetAngularSwing1Limit(EAngularConstraintMotion::ACM_Locked, 0.f);
+            PhysicsConstraint->SetAngularSwing2Limit(EAngularConstraintMotion::ACM_Locked, 0.f);
+            PhysicsConstraint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.f);
+            // PhysicsConstraint->ConstraintInstance.ProfileInstance.ConeLimit.bSoftConstraint = true;
+            // PhysicsConstraint->ConstraintInstance.ProfileInstance.TwistLimit.bSoftConstraint = true;
+
+            PhysicsConstraint->RegisterComponent();
+
+            ReceiveObjectRefs.Add(ReceiveObjectRef, ReceiveObject.Value);
+        }
+        else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(ReceiveObject.Key))
         {
-            UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetName())
-            continue;
+            ReceiveObjectRefs.Add(ReceiveObject.Key, ReceiveObject.Value);
         }
-        if (!StaticMeshComponent->IsSimulatingPhysics())
-        {
-            UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetName())
-            StaticMeshComponent->SetSimulatePhysics(true);
-        }
-
-        UMaterial *RedMaterial = GetMaterial(FLinearColor(1, 0, 0, 1));
-        for (int32 i = 0; i < StaticMeshComponent->GetMaterials().Num(); i++)
-        {
-            StaticMeshComponent->SetMaterial(i, RedMaterial);
-        }
-
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.Template = StaticMeshActor;
-        SpawnParams.Name = *(ReceiveObject.Key->GetActorLabel() + TEXT("_ref"));
-        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        AActor *ReceiveObjectRef = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(), SpawnParams);
-        if (ReceiveObjectRef == nullptr)
-        {
-            UE_LOG(LogStateController, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
-            continue;
-        }
-
-        ReceiveObjectRef->SetActorLabel(SpawnParams.Name.ToString());
-
-        AStaticMeshActor *StaticMeshActorRef = Cast<AStaticMeshActor>(ReceiveObjectRef);
-
-        UStaticMeshComponent *StaticMeshComponentRef = StaticMeshActorRef->GetStaticMeshComponent();
-        StaticMeshComponentRef->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-        StaticMeshComponentRef->SetSimulatePhysics(false);
-
-        UMaterial *GrayMaterial = GetMaterial(FLinearColor(0.1, 0.1, 0.1, 1));
-        for (int32 i = 0; i < StaticMeshComponentRef->GetMaterials().Num(); i++)
-        {
-            StaticMeshComponentRef->SetMaterial(i, GrayMaterial);
-        }
-
-        UPhysicsConstraintComponent *PhysicsConstraint = NewObject<UPhysicsConstraintComponent>(StaticMeshActorRef);
-        PhysicsConstraint->AttachToComponent(StaticMeshComponentRef, FAttachmentTransformRules::KeepWorldTransform);
-        PhysicsConstraint->SetWorldLocation(StaticMeshActorRef->GetActorLocation());
-
-        PhysicsConstraint->ComponentName1.ComponentName = *StaticMeshActorRef->GetName();
-        PhysicsConstraint->ComponentName2.ComponentName = *StaticMeshActor->GetName();
-        PhysicsConstraint->ConstraintActor1 = StaticMeshActorRef;
-        PhysicsConstraint->ConstraintActor2 = StaticMeshActor;
-        PhysicsConstraint->ConstraintInstance.Pos1 = FVector();
-        PhysicsConstraint->ConstraintInstance.Pos2 = FVector();
-
-        PhysicsConstraint->SetConstrainedComponents(StaticMeshComponentRef, NAME_None, StaticMeshComponent, NAME_None);
-
-        // Enable linear constraint in all axes
-        PhysicsConstraint->SetLinearXLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
-        PhysicsConstraint->SetLinearYLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
-        PhysicsConstraint->SetLinearZLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
-
-        // Enable angular constraint in all axes
-        PhysicsConstraint->SetAngularSwing1Limit(EAngularConstraintMotion::ACM_Locked, 0.f);
-        PhysicsConstraint->SetAngularSwing2Limit(EAngularConstraintMotion::ACM_Locked, 0.f);
-        PhysicsConstraint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.f);
-
-        PhysicsConstraint->RegisterComponent();
-
-        ReceiveObjectRefs.Add(ReceiveObjectRef, ReceiveObject.Value);
     }
 
     if (SendObjects.Num() > 0 || ReceiveObjectRefs.Num() > 0)
@@ -163,15 +277,7 @@ void UStateController::SendMetaData()
     ReceiveDataArray.Empty();
 
     Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
-                                                          { const TMap<EAttribute, TArray<double>> AttributeMap =
-        {
-            {EAttribute::Position, {0.0, 0.0, 0.0}},
-            {EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
-            {EAttribute::JointRvalue, {0.0}},
-            {EAttribute::JointTvalue, {0.0}},
-            {EAttribute::JointPosition, {0.0, 0.0, 0.0}},
-            {EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
-
+                                                          { 
         TSharedPtr<FJsonObject> MetaDataJson = MakeShareable(new FJsonObject);
         MetaDataJson->SetStringField("time", "microseconds");
         MetaDataJson->SetStringField("simulator", "unreal");
@@ -192,43 +298,7 @@ void UStateController::SendMetaData()
                 continue;
             }
 
-            TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-            for (const EAttribute Attribute : SendObject.Value.Attributes)
-            {
-                switch (Attribute)
-                {
-                case EAttribute::Position:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
-                    break;
-
-                case EAttribute::Quaternion:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
-                    break;
-
-                case EAttribute::JointRvalue:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_rvalue"))));
-                    break;
-
-                case EAttribute::JointTvalue:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_tvalue"))));
-                    break;
-
-                case EAttribute::JointPosition:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_position"))));
-                    break;
-
-                case EAttribute::JointQuaternion:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_quaternion"))));
-                    break;
-
-                default:
-                    break;
-                }
-
-                SendDataArray.Add(TPair<AActor *, EAttribute>(SendObject.Key, Attribute));
-                send_buffer_size += AttributeMap[Attribute].Num();
-            }
-            MetaDataSendJson->SetArrayField(SendObject.Key->GetActorLabel(), AttributeJsonArray);
+            SetMetaData(SendDataArray, send_buffer_size, MetaDataSendJson, SendObject, CachedRBoneNames, CachedTBoneNames);
         }
 
         TSharedPtr<FJsonObject> MetaDataReceiveJson = MakeShareable(new FJsonObject);
@@ -244,60 +314,7 @@ void UStateController::SendMetaData()
                 continue;
             }
 
-            AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(ReceiveObjectRef.Key);
-            if (StaticMeshActor == nullptr)
-            {
-                UE_LOG(LogStateController, Warning, TEXT("Ignore Non-StaticMeshActor %s in ReceiveObjectRefs"), *ReceiveObjectRef.Key->GetName())
-                continue;
-            }
-            else if (StaticMeshActor->GetStaticMeshComponent() == nullptr)
-            {
-                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s in ReceiveObjectRefs has None StaticMeshComponent"), *ReceiveObjectRef.Key->GetName())
-                continue;
-            }
-
-            StaticMeshActor->GetStaticMeshComponent()->SetSimulatePhysics(false);
-
-            TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-            for (const EAttribute &Attribute : ReceiveObjectRef.Value.Attributes)
-            {
-                switch (Attribute)
-                {
-                case EAttribute::Position:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
-                    break;
-
-                case EAttribute::Quaternion:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
-                    break;
-
-                case EAttribute::JointRvalue:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_rvalue"))));
-                    break;
-
-                case EAttribute::JointTvalue:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_tvalue"))));
-                    break;
-
-                case EAttribute::JointPosition:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_position"))));
-                    break;
-
-                case EAttribute::JointQuaternion:
-                    AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_quaternion"))));
-                    break;
-
-                default:
-                    break;
-                }
-
-                ReceiveDataArray.Add(TPair<AActor *, EAttribute>(ReceiveObjectRef.Key, Attribute));
-                receive_buffer_size += AttributeMap[Attribute].Num();
-            }
-
-            FString ReceiveObjectName = ReceiveObjectRef.Key->GetActorLabel();
-            ReceiveObjectName.RemoveFromEnd(TEXT("_ref"));
-            MetaDataReceiveJson->SetArrayField(ReceiveObjectName, AttributeJsonArray);
+            SetMetaData(ReceiveDataArray, receive_buffer_size, MetaDataReceiveJson, ReceiveObjectRef, CachedRBoneNames, CachedTBoneNames);
         }
 
         FString MetaDataString;
@@ -383,6 +400,44 @@ void UStateController::SendMetaData()
                             break;
                         }
 
+                        case EAttribute::JointRvalue:
+                        {
+                            if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendObject.Key))
+                            {
+                                if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+                                {
+                                    if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+                                    {
+                                        for (const FName &BoneName : CachedRBoneNames[SendObject.Key])
+                                        {
+                                            const float JointRvalue = *buffer_addr++;
+                                            USAnim->JointPoses[BoneName].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+
+                        case EAttribute::JointTvalue:
+                        {
+                            if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendObject.Key))
+                            {
+                                if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+                                {
+                                    if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+                                    {
+                                        for (const FName &BoneName : CachedTBoneNames[SendObject.Key])
+                                        {
+                                            const float JointTvalue = *buffer_addr++;
+                                            USAnim->JointPoses[BoneName].SetTranslation(FVector(0.f, JointTvalue, 0.f));
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+
                         case EAttribute::JointPosition:
                         {
                             break;
@@ -439,6 +494,49 @@ void UStateController::Tick()
                 break;
             }
 
+            case EAttribute::JointRvalue:
+            {
+                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendData.Key))
+                {
+                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+                    {
+                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+                        {
+                            for (const FName &BoneName : CachedRBoneNames[SendData.Key])
+                            {
+                                const FQuat JointQuat = USAnim->JointPoses[BoneName].GetRotation();
+                                *send_buffer_addr++ = JointQuat.W;
+                                *send_buffer_addr++ = JointQuat.X;
+                                *send_buffer_addr++ = JointQuat.Y;
+                                *send_buffer_addr++ = JointQuat.Z;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+
+            case EAttribute::JointTvalue:
+            {
+                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendData.Key))
+                {
+                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+                    {
+                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+                        {
+                            for (const FName &BoneName : CachedTBoneNames[SendData.Key])
+                            {
+                                const FVector JointPosition = USAnim->JointPoses[BoneName].GetTranslation();
+                                *send_buffer_addr++ = JointPosition.X;
+                                *send_buffer_addr++ = JointPosition.Y;
+                                *send_buffer_addr++ = JointPosition.Z;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+
             default:
                 break;
             }
@@ -481,6 +579,44 @@ void UStateController::Tick()
                 const float Y = *receive_buffer_addr++;
                 const float Z = *receive_buffer_addr++;
                 ReceiveData.Key->SetActorRotation(FQuat(X, Y, Z, W));
+                break;
+            }
+
+            case EAttribute::JointRvalue:
+            {
+                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(ReceiveData.Key))
+                {
+                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+                    {
+                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+                        {
+                            for (const FName &BoneName : CachedRBoneNames[ReceiveData.Key])
+                            {
+                                const float JointRvalue = *receive_buffer_addr++;
+                                USAnim->JointPoses[BoneName].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+
+            case EAttribute::JointTvalue:
+            {
+                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(ReceiveData.Key))
+                {
+                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+                    {
+                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+                        {
+                            for (const FName &BoneName : CachedTBoneNames[ReceiveData.Key])
+                            {
+                                const float JointTvalue = *receive_buffer_addr++;
+                                USAnim->JointPoses[BoneName].SetTranslation(FVector(0.f, JointTvalue, 0.f));
+                            }
+                        }
+                    }
+                }
                 break;
             }
 
