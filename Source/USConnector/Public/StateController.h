@@ -15,7 +15,7 @@ enum class EAttribute : uint8
 	Position,
 	Quaternion,
 	JointRvalue,
-    JointTvalue,
+	JointTvalue,
 	JointPosition,
 	JointQuaternion
 };
@@ -30,6 +30,8 @@ public:
 	TSet<EAttribute> Attributes;
 };
 
+class ASkeletalMeshActor;
+
 UCLASS(Blueprintable, DefaultToInstanced, collapsecategories, hidecategories = Object, editinlinenew)
 class USCONNECTOR_API UStateController : public UObject
 {
@@ -37,7 +39,7 @@ class USCONNECTOR_API UStateController : public UObject
 
 public:
 	UStateController();
-    
+
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString Host;
@@ -52,9 +54,9 @@ public:
 	TMap<AActor *, FAttributeContainer> ReceiveObjects;
 
 private:
-	TArray<TPair<AActor *, EAttribute>> SendDataArray;
+	TArray<TPair<FString, EAttribute>> SendDataArray;
 
-	TArray<TPair<AActor *, EAttribute>> ReceiveDataArray;
+	TArray<TPair<FString, EAttribute>> ReceiveDataArray;
 
 	void *context;
 
@@ -76,9 +78,9 @@ private:
 
 	FGraphEventRef Task;
 
-	TMap<AActor*, TArray<FName>> CachedRBoneNames;
+	TMap<FString, AActor *> CachedActors;
 
-	TMap<AActor*, TArray<FName>> CachedTBoneNames;
+	TMap<FString, TPair<class UUSAnim *, FName>> CachedBoneNames;
 
 private:
 	UPROPERTY(VisibleAnywhere)

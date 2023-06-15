@@ -7,6 +7,7 @@
 #include "Animation/SkeletalMeshActor.h"
 #include "Engine/StaticMeshActor.h"
 #include "Json.h"
+#include "Math/UnrealMathUtility.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "StateManager.h"
 #include "USAnim.h"
@@ -23,11 +24,11 @@ const TMap<EAttribute, TArray<double>> AttributeMap =
         {EAttribute::JointPosition, {0.0, 0.0, 0.0}},
         {EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
 
-static void SetMetaData(TArray<TPair<AActor *, EAttribute>> &DataArray,
+static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                         size_t &buffer_size, TSharedPtr<FJsonObject> &MetaDataJson,
                         const TPair<AActor *, FAttributeContainer> &Object,
-                        TMap<AActor *, TArray<FName>> &CachedRBoneNames,
-                        TMap<AActor *, TArray<FName>> &CachedTBoneNames)
+                        TMap<FString, AActor *> &CachedActors,
+                        TMap<FString, TPair<UUSAnim *, FName>> &CachedBoneNames)
 {
     if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
     {
@@ -53,7 +54,8 @@ static void SetMetaData(TArray<TPair<AActor *, EAttribute>> &DataArray,
                 break;
             }
 
-            DataArray.Add(TPair<AActor *, EAttribute>(Object.Key, Attribute));
+            DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetActorLabel(), Attribute));
+            CachedActors.Add(Object.Key->GetActorLabel(), Object.Key);
             buffer_size += AttributeMap[Attribute].Num();
         }
 
@@ -71,55 +73,42 @@ static void SetMetaData(TArray<TPair<AActor *, EAttribute>> &DataArray,
                 SkeletalMeshComponent->GetBoneNames(BoneNames);
                 BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
                                { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
-                CachedRBoneNames.Add(Object.Key, {});
                 for (const FName &BoneName : BoneNames)
                 {
                     FString BoneNameStr = BoneName.ToString();
-                    if ((BoneNameStr.EndsWith(TEXT("_revolute_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_revolute_bone"))) ||
-                        (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone"))))
+                    if (((BoneNameStr.EndsWith(TEXT("_revolute_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_revolute_bone"))) ||
+                         (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone")))) &&
+                        Object.Value.Attributes.Contains(EAttribute::JointRvalue))
                     {
-                        CachedRBoneNames[Object.Key].Add(BoneName);
-                        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-                        for (const EAttribute &Attribute : Object.Value.Attributes)
-                        {
-                            switch (Attribute)
-                            {
-                            case EAttribute::JointRvalue:
-                            {
-                                AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_rvalue"))));
-                                break;
-                            }
-                            }
-                            buffer_size += AttributeMap[Attribute].Num();
-                        }
+                        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_rvalue")))};
+                        CachedBoneNames.Add(BoneNameStr, TPair<UUSAnim *, FName>(USAnim, BoneName));
+                        DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointRvalue));
+                        buffer_size += AttributeMap[EAttribute::JointRvalue].Num();
                         MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
                     }
-                    else if (BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone")))
+                    else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
+                             Object.Value.Attributes.Contains(EAttribute::JointTvalue))
                     {
-                        CachedTBoneNames[Object.Key].Add(BoneName);
-                        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-                        for (const EAttribute &Attribute : Object.Value.Attributes)
-                        {
-                            switch (Attribute)
-                            {
-                            case EAttribute::JointTvalue:
-                            {
-                                AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("joint_tvalue"))));
-                                break;
-                            }
-                            }
-                            buffer_size += AttributeMap[Attribute].Num();
-                        }
+                        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_tvalue")))};
+                        CachedBoneNames.Add(BoneNameStr, TPair<UUSAnim *, FName>(USAnim, BoneName));
+                        DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointTvalue));
+                        buffer_size += AttributeMap[EAttribute::JointTvalue].Num();
                         MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
                     }
-                }
-
-                for (const EAttribute &Attribute : Object.Value.Attributes)
-                {
-                    DataArray.Add(TPair<AActor *, EAttribute>(Object.Key, Attribute));
                 }
             }
+            else
+            {
+                UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a USAnim."), *SkeletalMeshActor->GetName())
+            }
         }
+        else
+        {
+            UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetName())
+        }
+
+        DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
+                          { return DataB.Key.Compare(DataA.Key) > 0; });
     }
 }
 
@@ -284,6 +273,7 @@ void UStateController::SendMetaData()
         MetaDataJson->SetStringField("length_unit", "cm");
         MetaDataJson->SetStringField("angle_unit", "deg");
         MetaDataJson->SetStringField("handedness", "lhs");
+        MetaDataJson->SetStringField("force_unit", "N");
 
         TSharedPtr<FJsonObject> MetaDataSendJson = MakeShareable(new FJsonObject);
         MetaDataJson->SetObjectField("send", MetaDataSendJson);
@@ -298,7 +288,7 @@ void UStateController::SendMetaData()
                 continue;
             }
 
-            SetMetaData(SendDataArray, send_buffer_size, MetaDataSendJson, SendObject, CachedRBoneNames, CachedTBoneNames);
+            SetMetaData(SendDataArray, send_buffer_size, MetaDataSendJson, SendObject, CachedActors, CachedBoneNames);
         }
 
         TSharedPtr<FJsonObject> MetaDataReceiveJson = MakeShareable(new FJsonObject);
@@ -314,7 +304,7 @@ void UStateController::SendMetaData()
                 continue;
             }
 
-            SetMetaData(ReceiveDataArray, receive_buffer_size, MetaDataReceiveJson, ReceiveObjectRef, CachedRBoneNames, CachedTBoneNames);
+            SetMetaData(ReceiveDataArray, receive_buffer_size, MetaDataReceiveJson, ReceiveObjectRef, CachedActors, CachedBoneNames);
         }
 
         FString MetaDataString;
@@ -368,83 +358,57 @@ void UStateController::SendMetaData()
 
                 double *buffer_addr = buffer + 3;
 
-                for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
+                for (const TPair<FString, EAttribute> &SendData : SendDataArray)
                 {
-                    if (SendObject.Key == nullptr)
+                    if (CachedActors.Contains(SendData.Key))
                     {
-                        UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in SendObjects"))
-                        continue;
-                    }
+                        if (CachedActors[SendData.Key] == nullptr)
+                        {
+                            UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in CachedActors"))
+                            continue;
+                        }
 
-                    TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-                    for (const EAttribute Attribute : SendObject.Value.Attributes)
-                    {
-                        switch (Attribute)
+                        switch (SendData.Value)
                         {
                         case EAttribute::Position:
                         {
-                            const float X = *buffer_addr++;
-                            const float Y = *buffer_addr++;
-                            const float Z = *buffer_addr++;
-                            SendObject.Key->SetActorLocation(FVector(X, Y, Z));
+                            const double X = *buffer_addr++;
+                            const double Y = *buffer_addr++;
+                            const double Z = *buffer_addr++;
+                            CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
                             break;
                         }
 
                         case EAttribute::Quaternion:
                         {
-                            const float W = *buffer_addr++;
-                            const float X = *buffer_addr++;
-                            const float Y = *buffer_addr++;
-                            const float Z = *buffer_addr++;
-                            SendObject.Key->SetActorRotation(FQuat(X, Y, Z, W));
+                            const double W = *buffer_addr++;
+                            const double X = *buffer_addr++;
+                            const double Y = *buffer_addr++;
+                            const double Z = *buffer_addr++;
+                            CachedActors[SendData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
                             break;
                         }
 
+                        default:
+                            break;
+                        }
+                    }
+                    else if (CachedBoneNames.Contains(SendData.Key))
+                    {
+                        switch (SendData.Value)
+                        {
                         case EAttribute::JointRvalue:
                         {
-                            if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendObject.Key))
-                            {
-                                if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
-                                {
-                                    if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
-                                    {
-                                        for (const FName &BoneName : CachedRBoneNames[SendObject.Key])
-                                        {
-                                            const float JointRvalue = *buffer_addr++;
-                                            USAnim->JointPoses[BoneName].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-                                        }
-                                    }
-                                }
-                            }
+                            const double JointRvalue = *buffer_addr++;
+                            CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
                             break;
                         }
 
                         case EAttribute::JointTvalue:
                         {
-                            if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendObject.Key))
-                            {
-                                if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
-                                {
-                                    if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
-                                    {
-                                        for (const FName &BoneName : CachedTBoneNames[SendObject.Key])
-                                        {
-                                            const float JointTvalue = *buffer_addr++;
-                                            USAnim->JointPoses[BoneName].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-                                        }
-                                    }
-                                }
-                            }
-                            break;
-                        }
-
-                        case EAttribute::JointPosition:
-                        {
-                            break;
-                        }
-
-                        case EAttribute::JointQuaternion:
-                        {
+                            const double JointTvalue = *buffer_addr++;
+                            const double Scale = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetScale3D().Y;
+                            CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue / Scale, 0.f));
                             break;
                         }
 
@@ -471,74 +435,63 @@ void UStateController::Tick()
         *send_buffer = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
         double *send_buffer_addr = send_buffer + 1;
-        for (TPair<AActor *, EAttribute> &SendData : SendDataArray)
+        for (const TPair<FString, EAttribute> &SendData : SendDataArray)
         {
-            switch (SendData.Value)
+            if (CachedActors.Contains(SendData.Key))
             {
-            case EAttribute::Position:
-            {
-                const FVector ActorLocation = SendData.Key->GetActorLocation();
-                *send_buffer_addr++ = ActorLocation.X;
-                *send_buffer_addr++ = ActorLocation.Y;
-                *send_buffer_addr++ = ActorLocation.Z;
-                break;
-            }
-
-            case EAttribute::Quaternion:
-            {
-                const FQuat ActorQuat = SendData.Key->GetActorQuat();
-                *send_buffer_addr++ = ActorQuat.W;
-                *send_buffer_addr++ = ActorQuat.X;
-                *send_buffer_addr++ = ActorQuat.Y;
-                *send_buffer_addr++ = ActorQuat.Z;
-                break;
-            }
-
-            case EAttribute::JointRvalue:
-            {
-                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendData.Key))
+                if (CachedActors[SendData.Key] == nullptr)
                 {
-                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
-                    {
-                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
-                        {
-                            for (const FName &BoneName : CachedRBoneNames[SendData.Key])
-                            {
-                                const FQuat JointQuat = USAnim->JointPoses[BoneName].GetRotation();
-                                *send_buffer_addr++ = JointQuat.W;
-                                *send_buffer_addr++ = JointQuat.X;
-                                *send_buffer_addr++ = JointQuat.Y;
-                                *send_buffer_addr++ = JointQuat.Z;
-                            }
-                        }
-                    }
+                    UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in CachedActors"))
+                    continue;
                 }
-                break;
-            }
 
-            case EAttribute::JointTvalue:
-            {
-                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(SendData.Key))
+                switch (SendData.Value)
                 {
-                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
-                    {
-                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
-                        {
-                            for (const FName &BoneName : CachedTBoneNames[SendData.Key])
-                            {
-                                const FVector JointPosition = USAnim->JointPoses[BoneName].GetTranslation();
-                                *send_buffer_addr++ = JointPosition.X;
-                                *send_buffer_addr++ = JointPosition.Y;
-                                *send_buffer_addr++ = JointPosition.Z;
-                            }
-                        }
-                    }
+                case EAttribute::Position:
+                {
+                    const FVector ActorLocation = CachedActors[SendData.Key]->GetActorLocation();
+                    *send_buffer_addr++ = ActorLocation.X;
+                    *send_buffer_addr++ = ActorLocation.Y;
+                    *send_buffer_addr++ = ActorLocation.Z;
+                    break;
                 }
-                break;
-            }
 
-            default:
-                break;
+                case EAttribute::Quaternion:
+                {
+                    const FQuat ActorQuat = CachedActors[SendData.Key]->GetActorQuat();
+                    *send_buffer_addr++ = ActorQuat.W;
+                    *send_buffer_addr++ = ActorQuat.X;
+                    *send_buffer_addr++ = ActorQuat.Y;
+                    *send_buffer_addr++ = ActorQuat.Z;
+                    break;
+                }
+
+                default:
+                    break;
+                }
+            }
+            else if (CachedBoneNames.Contains(SendData.Key))
+            {
+                switch (SendData.Value)
+                {
+                case EAttribute::JointRvalue:
+                {
+                    const FQuat JointQuaternion = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetRotation();
+                    *send_buffer_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
+                    break;
+                }
+
+                case EAttribute::JointTvalue:
+                {
+                    const FVector JointPosition = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetTranslation();
+                    const double Scale = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetScale3D().Y;
+                    *send_buffer_addr++ = JointPosition.Y * Scale;
+                    break;
+                }
+
+                default:
+                    break;
+                }
             }
         }
 
@@ -559,69 +512,64 @@ void UStateController::Tick()
         }
 
         double *receive_buffer_addr = receive_buffer + 1;
-        for (TPair<AActor *, EAttribute> &ReceiveData : ReceiveDataArray)
+        for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
         {
-            switch (ReceiveData.Value)
+            if (CachedActors.Contains(ReceiveData.Key))
             {
-            case EAttribute::Position:
-            {
-                const float X = *receive_buffer_addr++;
-                const float Y = *receive_buffer_addr++;
-                const float Z = *receive_buffer_addr++;
-                ReceiveData.Key->SetActorLocation(FVector(X, Y, Z));
-                break;
-            }
-
-            case EAttribute::Quaternion:
-            {
-                const float W = *receive_buffer_addr++;
-                const float X = *receive_buffer_addr++;
-                const float Y = *receive_buffer_addr++;
-                const float Z = *receive_buffer_addr++;
-                ReceiveData.Key->SetActorRotation(FQuat(X, Y, Z, W));
-                break;
-            }
-
-            case EAttribute::JointRvalue:
-            {
-                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(ReceiveData.Key))
+                if (CachedActors[ReceiveData.Key] == nullptr)
                 {
-                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
-                    {
-                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
-                        {
-                            for (const FName &BoneName : CachedRBoneNames[ReceiveData.Key])
-                            {
-                                const float JointRvalue = *receive_buffer_addr++;
-                                USAnim->JointPoses[BoneName].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-                            }
-                        }
-                    }
+                    UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in CachedActors"))
+                    continue;
                 }
-                break;
-            }
 
-            case EAttribute::JointTvalue:
-            {
-                if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(ReceiveData.Key))
+                switch (ReceiveData.Value)
                 {
-                    if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
-                    {
-                        if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
-                        {
-                            for (const FName &BoneName : CachedTBoneNames[ReceiveData.Key])
-                            {
-                                const float JointTvalue = *receive_buffer_addr++;
-                                USAnim->JointPoses[BoneName].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-                            }
-                        }
-                    }
+                case EAttribute::Position:
+                {
+                    const double X = *receive_buffer_addr++;
+                    const double Y = *receive_buffer_addr++;
+                    const double Z = *receive_buffer_addr++;
+                    CachedActors[ReceiveData.Key]->SetActorLocation(FVector(X, Y, Z));
+                    break;
                 }
-                break;
-            }
 
-            default:
-                break;
+                case EAttribute::Quaternion:
+                {
+                    const double W = *receive_buffer_addr++;
+                    const double X = *receive_buffer_addr++;
+                    const double Y = *receive_buffer_addr++;
+                    const double Z = *receive_buffer_addr++;
+                    CachedActors[ReceiveData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
+                    break;
+                }
+
+                default:
+                    break;
+                }
+            }
+            else if (CachedBoneNames.Contains(ReceiveData.Key))
+            {
+                switch (ReceiveData.Value)
+                {
+                case EAttribute::JointRvalue:
+                {
+                    const double JointRvalue = *receive_buffer_addr++;
+                    CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
+                    break;
+                }
+
+                case EAttribute::JointTvalue:
+                {
+                    const double JointTvalue = *receive_buffer_addr++;
+                    const double Scale = CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].GetScale3D().Length();
+                    UE_LOG(LogStateController, Log, TEXT("%s - %d"), *CachedBoneNames[ReceiveData.Key].Value.ToString(), Scale)
+                    CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue / Scale, 0.f));
+                    break;
+                }
+
+                default:
+                    break;
+                }
             }
         }
     }
