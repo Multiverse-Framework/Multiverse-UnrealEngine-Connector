@@ -108,7 +108,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
         }
 
         DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
-                          { return DataB.Key.Compare(DataA.Key) > 0; });
+                       { return DataB.Key.Compare(DataA.Key) > 0; });
     }
 }
 
@@ -347,7 +347,12 @@ void UStateController::SendMetaData()
         size_t recv_buffer_size[2] = {(size_t)buffer[0], (size_t)buffer[1]};
         if (recv_buffer_size[0] != send_buffer_size || recv_buffer_size[1] != receive_buffer_size)
         {
-            UE_LOG(LogStateController, Error, TEXT("Failed to initialize the socket at %s: send_buffer_size(server = %ld != client = %ld), receive_buffer_size(server = %ld != client = %ld)."), *SocketAddr, recv_buffer_size[0], send_buffer_size, recv_buffer_size[1], receive_buffer_size)
+            UE_LOG(LogStateController, Error, TEXT("Failed to initialize the socket at %s: send_buffer_size(server = %ld != client = %ld), receive_buffer_size(server = %ld != client = %ld)."), 
+                *SocketAddr, 
+                recv_buffer_size[0], 
+                send_buffer_size, 
+                recv_buffer_size[1], 
+                receive_buffer_size)
             zmq_disconnect(socket_client, socket_addr.c_str());
         }
         else
@@ -424,7 +429,9 @@ void UStateController::SendMetaData()
             send_buffer = (double *)calloc(send_buffer_size, sizeof(double));
             receive_buffer = (double *)calloc(receive_buffer_size, sizeof(double));
             IsEnable = true;
-        } },
+        }
+        
+        free(buffer); },
                                                           TStatId(), nullptr, ENamedThreads::AnyThread);
 }
 
@@ -435,6 +442,7 @@ void UStateController::Tick()
         *send_buffer = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
         double *send_buffer_addr = send_buffer + 1;
+
         for (const TPair<FString, EAttribute> &SendData : SendDataArray)
         {
             if (CachedActors.Contains(SendData.Key))
@@ -586,9 +594,13 @@ void UStateController::Deinit()
 
         zmq_disconnect(socket_client, socket_addr.c_str());
     }
-    else if (Task.IsValid())
+    else
     {
         zmq_ctx_shutdown(context);
+    }
+
+    if (Task.IsValid())
+    {
         Task->Wait();
     }
 }
