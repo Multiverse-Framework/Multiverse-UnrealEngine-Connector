@@ -99,12 +99,12 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
             }
             else
             {
-                UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a USAnim."), *SkeletalMeshActor->GetName())
+                UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a USAnim."), *SkeletalMeshActor->GetActorLabel())
             }
         }
         else
         {
-            UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetName())
+            UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetActorLabel())
         }
 
         DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
@@ -139,12 +139,12 @@ void UStateController::Init()
     if (SendObjects.Num() > 0)
     {
         SendObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-                            { return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
+                            { return ActorB.GetActorLabel().Compare(ActorA.GetActorLabel()) > 0; });
     }
     if (ReceiveObjects.Num() > 0)
     {
         ReceiveObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-                               { return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
+                               { return ActorB.GetActorLabel().Compare(ActorA.GetActorLabel()) > 0; });
     }
 
     UWorld *World = GetWorld();
@@ -167,12 +167,12 @@ void UStateController::Init()
             UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
             if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
             {
-                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetName())
+                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetActorLabel())
                 continue;
             }
             if (!StaticMeshComponent->IsSimulatingPhysics())
             {
-                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetName())
+                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetActorLabel())
                 StaticMeshComponent->SetSimulatePhysics(true);
             }
 
@@ -305,7 +305,7 @@ void UStateController::SendMetaData()
             }
 
             SetMetaData(ReceiveDataArray, receive_buffer_size, MetaDataReceiveJson, ReceiveObjectRef, CachedActors, CachedBoneNames);
-        }
+        }        
 
         FString MetaDataString;
         TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&MetaDataString);
