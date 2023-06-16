@@ -268,7 +268,7 @@ void UStateController::SendMetaData()
     Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
                                                           { 
         TSharedPtr<FJsonObject> MetaDataJson = MakeShareable(new FJsonObject);
-        MetaDataJson->SetStringField("time", "microseconds");
+        MetaDataJson->SetStringField("time_unit", "s");
         MetaDataJson->SetStringField("simulator", "unreal");
         MetaDataJson->SetStringField("length_unit", "cm");
         MetaDataJson->SetStringField("angle_unit", "deg");
@@ -375,6 +375,7 @@ void UStateController::SendMetaData()
                             const double X = *buffer_addr++;
                             const double Y = *buffer_addr++;
                             const double Z = *buffer_addr++;
+                            UE_LOG(LogStateController, Log, TEXT("%s - [%f %f %f]"), *SendData.Key, X, Y, Z)
                             CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
                             break;
                         }
@@ -407,8 +408,7 @@ void UStateController::SendMetaData()
                         case EAttribute::JointTvalue:
                         {
                             const double JointTvalue = *buffer_addr++;
-                            const double Scale = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetScale3D().Y;
-                            CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue / Scale, 0.f));
+                            CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
                             break;
                         }
 
@@ -484,8 +484,7 @@ void UStateController::Tick()
                 case EAttribute::JointTvalue:
                 {
                     const FVector JointPosition = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetTranslation();
-                    const double Scale = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetScale3D().Y;
-                    *send_buffer_addr++ = JointPosition.Y * Scale;
+                    *send_buffer_addr++ = JointPosition.Y;
                     break;
                 }
 
@@ -561,9 +560,7 @@ void UStateController::Tick()
                 case EAttribute::JointTvalue:
                 {
                     const double JointTvalue = *receive_buffer_addr++;
-                    const double Scale = CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].GetScale3D().Length();
-                    UE_LOG(LogStateController, Log, TEXT("%s - %d"), *CachedBoneNames[ReceiveData.Key].Value.ToString(), Scale)
-                    CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue / Scale, 0.f));
+                    CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
                     break;
                 }
 
