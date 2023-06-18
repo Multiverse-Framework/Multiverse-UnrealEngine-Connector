@@ -3,9 +3,9 @@
 using System.IO;
 using UnrealBuildTool;
 
-public class USConnectorEditor : ModuleRules
+public class MultiverseConnectorEditor : ModuleRules
 {
-  public USConnectorEditor(ReadOnlyTargetRules Target) : base(Target)
+  public MultiverseConnectorEditor(ReadOnlyTargetRules Target) : base(Target)
   {
     PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -20,7 +20,7 @@ public class USConnectorEditor : ModuleRules
         "BlueprintGraph",
         "AnimGraph",
         "AnimGraphRuntime",
-        "USConnector"
+        "MultiverseConnector"
       }
       );
 

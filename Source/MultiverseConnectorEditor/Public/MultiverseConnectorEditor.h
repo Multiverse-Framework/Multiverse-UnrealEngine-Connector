@@ -5,15 +5,10 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FUSConnectorModule : public IModuleInterface
+class FMultiverseConnectorEditorModule : public IModuleInterface
 {
 public:
-
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
-
-private:
-	/** Handle to the test dll we will load */
-	void *LibraryHandle;
 };

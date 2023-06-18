@@ -4,16 +4,16 @@
 
 #include "Animation/AnimInstance.h"
 // clang-format off
-#include "USAnim.generated.h"
+#include "MultiverseAnim.generated.h"
 // clang-format on
 
 UCLASS()
-class USCONNECTOR_API UUSAnim : public UAnimInstance
+class MULTIVERSECONNECTOR_API UMultiverseAnim : public UAnimInstance
 {
 	GENERATED_BODY()
 
 public:
-	UUSAnim();
+	UMultiverseAnim();
 
 public:
 	virtual void NativeBeginPlay() override;

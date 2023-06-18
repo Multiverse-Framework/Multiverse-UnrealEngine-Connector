@@ -1,12 +1,12 @@
 // Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
 
-#include "USAnim.h"
+#include "MultiverseAnim.h"
 
-UUSAnim::UUSAnim()
+UMultiverseAnim::UMultiverseAnim()
 {
 }
 
-void UUSAnim::NativeBeginPlay()
+void UMultiverseAnim::NativeBeginPlay()
 {
 	TArray<FName> BoneNames;
 	GetSkelMeshComponent()->GetBoneNames(BoneNames);
@@ -22,6 +22,6 @@ void UUSAnim::NativeBeginPlay()
 	}
 }
 
-void UUSAnim::NativeUpdateAnimation(float DeltaSeconds)
+void UMultiverseAnim::NativeUpdateAnimation(float DeltaSeconds)
 {
 }

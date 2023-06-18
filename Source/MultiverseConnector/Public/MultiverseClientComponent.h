@@ -6,7 +6,7 @@
 #include <string>
 
 // clang-format off
-#include "StateController.generated.h"
+#include "MultiverseClientComponent.generated.h"
 // clang-format on
 
 UENUM()
@@ -33,12 +33,12 @@ public:
 class ASkeletalMeshActor;
 
 UCLASS(Blueprintable, DefaultToInstanced, collapsecategories, hidecategories = Object, editinlinenew)
-class USCONNECTOR_API UStateController : public UObject
+class MULTIVERSECONNECTOR_API UMultiverseClientComponent : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	UStateController();
+	UMultiverseClientComponent();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -80,7 +80,7 @@ private:
 
 	TMap<FString, AActor *> CachedActors;
 
-	TMap<FString, TPair<class UUSAnim *, FName>> CachedBoneNames;
+	TMap<FString, TPair<class UMultiverseAnim *, FName>> CachedBoneNames;
 
 private:
 	UPROPERTY(VisibleAnywhere)

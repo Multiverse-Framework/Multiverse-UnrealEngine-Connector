@@ -1,6 +1,6 @@
 // Copyright (c) 2023, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
 
-#include "StateController.h"
+#include "MultiverseClientComponent.h"
 
 #include <chrono>
 
@@ -9,11 +9,11 @@
 #include "Json.h"
 #include "Math/UnrealMathUtility.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
-#include "StateManager.h"
-#include "USAnim.h"
+#include "MultiverseClient.h"
+#include "MultiverseAnim.h"
 #include "ZMQLibrary/zmq.hpp"
 
-DEFINE_LOG_CATEGORY_STATIC(LogStateController, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientComponent, Log, All);
 
 const TMap<EAttribute, TArray<double>> AttributeMap =
     {
@@ -28,7 +28,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                         size_t &buffer_size, TSharedPtr<FJsonObject> &MetaDataJson,
                         const TPair<AActor *, FAttributeContainer> &Object,
                         TMap<FString, AActor *> &CachedActors,
-                        TMap<FString, TPair<UUSAnim *, FName>> &CachedBoneNames)
+                        TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
 {
     if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
     {
@@ -67,7 +67,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
     {
         if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
         {
-            if (UUSAnim *USAnim = Cast<UUSAnim>(SkeletalMeshComponent->GetAnimInstance()))
+            if (UMultiverseAnim *MultiverseAnim = Cast<UMultiverseAnim>(SkeletalMeshComponent->GetAnimInstance()))
             {
                 TArray<FName> BoneNames;
                 SkeletalMeshComponent->GetBoneNames(BoneNames);
@@ -81,7 +81,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                         Object.Value.Attributes.Contains(EAttribute::JointRvalue))
                     {
                         TArray<TSharedPtr<FJsonValue>> AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_rvalue")))};
-                        CachedBoneNames.Add(BoneNameStr, TPair<UUSAnim *, FName>(USAnim, BoneName));
+                        CachedBoneNames.Add(BoneNameStr, TPair<UMultiverseAnim *, FName>(MultiverseAnim, BoneName));
                         DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointRvalue));
                         buffer_size += AttributeMap[EAttribute::JointRvalue].Num();
                         MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
@@ -90,7 +90,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                              Object.Value.Attributes.Contains(EAttribute::JointTvalue))
                     {
                         TArray<TSharedPtr<FJsonValue>> AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_tvalue")))};
-                        CachedBoneNames.Add(BoneNameStr, TPair<UUSAnim *, FName>(USAnim, BoneName));
+                        CachedBoneNames.Add(BoneNameStr, TPair<UMultiverseAnim *, FName>(MultiverseAnim, BoneName));
                         DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointTvalue));
                         buffer_size += AttributeMap[EAttribute::JointTvalue].Num();
                         MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
@@ -99,12 +99,12 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
             }
             else
             {
-                UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a USAnim."), *SkeletalMeshActor->GetActorLabel())
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetActorLabel())
             }
         }
         else
         {
-            UE_LOG(LogStateController, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetActorLabel())
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetActorLabel())
         }
 
         DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
@@ -112,7 +112,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
     }
 }
 
-UStateController::UStateController()
+UMultiverseClientComponent::UMultiverseClientComponent()
 {
     Host = TEXT("tcp://127.0.0.1");
     Port = 7500;
@@ -128,13 +128,13 @@ UStateController::UStateController()
         {FLinearColor(0.1, 0.1, 0.1, 1), TEXT("Gray")}};
 }
 
-UMaterial *UStateController::GetMaterial(const FLinearColor &Color) const
+UMaterial *UMultiverseClientComponent::GetMaterial(const FLinearColor &Color) const
 {
     const FString ColorName = TEXT("M_") + ColorMap[Color];
-    return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/USConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
+    return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/MultiverseConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
 }
 
-void UStateController::Init()
+void UMultiverseClientComponent::Init()
 {
     if (SendObjects.Num() > 0)
     {
@@ -150,7 +150,7 @@ void UStateController::Init()
     UWorld *World = GetWorld();
     if (World == nullptr)
     {
-        UE_LOG(LogStateController, Error, TEXT("World of %s is nullptr"), *GetName())
+        UE_LOG(LogMultiverseClientComponent, Error, TEXT("World of %s is nullptr"), *GetName())
         return;
     }
 
@@ -158,7 +158,7 @@ void UStateController::Init()
     {
         if (ReceiveObject.Key == nullptr)
         {
-            UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in ReceiveObjects."))
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjects."))
             continue;
         }
 
@@ -167,12 +167,12 @@ void UStateController::Init()
             UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
             if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
             {
-                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetActorLabel())
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetActorLabel())
                 continue;
             }
             if (!StaticMeshComponent->IsSimulatingPhysics())
             {
-                UE_LOG(LogStateController, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetActorLabel())
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetActorLabel())
                 StaticMeshComponent->SetSimulatePhysics(true);
             }
 
@@ -189,7 +189,7 @@ void UStateController::Init()
             AActor *ReceiveObjectRef = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(), SpawnParams);
             if (ReceiveObjectRef == nullptr)
             {
-                UE_LOG(LogStateController, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
+                UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
                 continue;
             }
 
@@ -245,7 +245,7 @@ void UStateController::Init()
 
     if (SendObjects.Num() > 0 || ReceiveObjectRefs.Num() > 0)
     {
-        UE_LOG(LogStateController, Log, TEXT("Initializing the socket connection..."))
+        UE_LOG(LogMultiverseClientComponent, Log, TEXT("Initializing the socket connection..."))
 
         context = zmq_ctx_new();
 
@@ -257,7 +257,7 @@ void UStateController::Init()
     }
 }
 
-void UStateController::SendMetaData()
+void UMultiverseClientComponent::SendMetaData()
 {
     zmq_disconnect(socket_client, socket_addr.c_str());
     zmq_connect(socket_client, socket_addr.c_str());
@@ -284,7 +284,7 @@ void UStateController::SendMetaData()
         {
             if (SendObject.Key == nullptr)
             {
-                UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in SendObjects"))
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in SendObjects"))
                 continue;
             }
 
@@ -300,7 +300,7 @@ void UStateController::SendMetaData()
         {
             if (ReceiveObjectRef.Key == nullptr)
             {
-                UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
                 continue;
             }
 
@@ -321,7 +321,7 @@ void UStateController::SendMetaData()
             meta_data_string += StringCast<ANSICHAR>(*Substring).Get();
         }
 
-        UE_LOG(LogStateController, Log, TEXT("%s"), *MetaDataString)
+        UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *MetaDataString)
         
 		while (true)
 		{
@@ -334,7 +334,7 @@ void UStateController::SendMetaData()
 			{
 				free(buffer);
 				buffer = (double *)calloc(send_buffer_size + 2, sizeof(double));
-				UE_LOG(LogStateController, Warning, TEXT("The socket server at %s has been terminated, resend the message"), *SocketAddr);
+				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("The socket server at %s has been terminated, resend the message"), *SocketAddr);
 				zmq_disconnect(socket_client, socket_addr.c_str());
                 zmq_connect(socket_client, socket_addr.c_str());
 			}
@@ -347,7 +347,7 @@ void UStateController::SendMetaData()
         size_t recv_buffer_size[2] = {(size_t)buffer[0], (size_t)buffer[1]};
         if (recv_buffer_size[0] != send_buffer_size || recv_buffer_size[1] != receive_buffer_size)
         {
-            UE_LOG(LogStateController, Error, TEXT("Failed to initialize the socket at %s: send_buffer_size(server = %ld != client = %ld), receive_buffer_size(server = %ld != client = %ld)."), 
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to initialize the socket at %s: send_buffer_size(server = %ld != client = %ld), receive_buffer_size(server = %ld != client = %ld)."), 
                 *SocketAddr, 
                 recv_buffer_size[0], 
                 send_buffer_size, 
@@ -359,7 +359,7 @@ void UStateController::SendMetaData()
         {
             if (buffer[2] < 0.0)
             {
-                UE_LOG(LogStateController, Log, TEXT("Continue state on socket %s"), *SocketAddr)
+                UE_LOG(LogMultiverseClientComponent, Log, TEXT("Continue state on socket %s"), *SocketAddr)
 
                 double *buffer_addr = buffer + 3;
 
@@ -369,7 +369,7 @@ void UStateController::SendMetaData()
                     {
                         if (CachedActors[SendData.Key] == nullptr)
                         {
-                            UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in CachedActors"))
+                            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
                             continue;
                         }
 
@@ -380,7 +380,7 @@ void UStateController::SendMetaData()
                             const double X = *buffer_addr++;
                             const double Y = *buffer_addr++;
                             const double Z = *buffer_addr++;
-                            UE_LOG(LogStateController, Log, TEXT("%s - [%f %f %f]"), *SendData.Key, X, Y, Z)
+                            UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s - [%f %f %f]"), *SendData.Key, X, Y, Z)
                             CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
                             break;
                         }
@@ -424,8 +424,8 @@ void UStateController::SendMetaData()
                 }
             }
 
-            UE_LOG(LogStateController, Log, TEXT("Initialized the socket at %s successfully."), *SocketAddr)
-            UE_LOG(LogStateController, Log, TEXT("Start communication on %s (send: %ld, receive: %ld)"), *SocketAddr, send_buffer_size, receive_buffer_size)
+            UE_LOG(LogMultiverseClientComponent, Log, TEXT("Initialized the socket at %s successfully."), *SocketAddr)
+            UE_LOG(LogMultiverseClientComponent, Log, TEXT("Start communication on %s (send: %ld, receive: %ld)"), *SocketAddr, send_buffer_size, receive_buffer_size)
             send_buffer = (double *)calloc(send_buffer_size, sizeof(double));
             receive_buffer = (double *)calloc(receive_buffer_size, sizeof(double));
             IsEnable = true;
@@ -435,7 +435,7 @@ void UStateController::SendMetaData()
                                                           TStatId(), nullptr, ENamedThreads::AnyThread);
 }
 
-void UStateController::Tick()
+void UMultiverseClientComponent::Tick()
 {
     if (IsEnable)
     {
@@ -449,7 +449,7 @@ void UStateController::Tick()
             {
                 if (CachedActors[SendData.Key] == nullptr)
                 {
-                    UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in CachedActors"))
+                    UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
                     continue;
                 }
 
@@ -509,7 +509,7 @@ void UStateController::Tick()
         if (*receive_buffer < 0)
         {
             IsEnable = false;
-            UE_LOG(LogStateController, Warning, TEXT("The socket server at %s has been terminated, resend the message"), *SocketAddr)
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("The socket server at %s has been terminated, resend the message"), *SocketAddr)
             if (Task.IsValid())
             {
                 Task->Wait();
@@ -525,7 +525,7 @@ void UStateController::Tick()
             {
                 if (CachedActors[ReceiveData.Key] == nullptr)
                 {
-                    UE_LOG(LogStateController, Warning, TEXT("Ignore None Object in CachedActors"))
+                    UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
                     continue;
                 }
 
@@ -580,9 +580,9 @@ void UStateController::Tick()
     }
 }
 
-void UStateController::Deinit()
+void UMultiverseClientComponent::Deinit()
 {
-    UE_LOG(LogStateController, Log, TEXT("Closing the socket client on %s"), *SocketAddr);
+    UE_LOG(LogMultiverseClientComponent, Log, TEXT("Closing the socket client on %s"), *SocketAddr);
     if (IsEnable)
     {
         const std::string close_data = "{}";

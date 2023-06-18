@@ -12,7 +12,7 @@
 // clang-format on
 
 UCLASS(meta = (Keywords = "Modify Transforms"))
-class USCONNECTOREDITOR_API UAnimGraphNode_ModifyBones : public UAnimGraphNode_SkeletalControlBase
+class MULTIVERSECONNECTOREDITOR_API UAnimGraphNode_ModifyBones : public UAnimGraphNode_SkeletalControlBase
 {
 	GENERATED_UCLASS_BODY()
 

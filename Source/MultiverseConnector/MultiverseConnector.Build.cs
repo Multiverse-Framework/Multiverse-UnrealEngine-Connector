@@ -3,9 +3,9 @@
 using System.IO;
 using UnrealBuildTool;
 
-public class USConnector : ModuleRules
+public class MultiverseConnector : ModuleRules
 {
-  public USConnector(ReadOnlyTargetRules Target) : base(Target)
+  public MultiverseConnector(ReadOnlyTargetRules Target) : base(Target)
   {
     PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 

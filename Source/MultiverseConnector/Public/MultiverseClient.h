@@ -4,19 +4,19 @@
 
 #include "GameFramework/Actor.h"
 // clang-format off
-#include "StateManager.generated.h"
+#include "MultiverseClient.generated.h"
 // clang-format on
 
-class UStateController;
+class UMultiverseClientComponent;
 
 UCLASS()
-class USCONNECTOR_API AStateManager : public AActor
+class MULTIVERSECONNECTOR_API AMultiverseClient : public AActor
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AStateManager();
+	AMultiverseClient();
 
 protected:
 	// Called when the game starts or when spawned
@@ -34,5 +34,5 @@ private:
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "State Controller")
-	UStateController *StateController;
+	UMultiverseClientComponent *MultiverseClientComponent;
 };

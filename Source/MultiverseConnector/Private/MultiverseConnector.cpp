@@ -1,20 +1,20 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "USConnector.h"
+#include "MultiverseConnector.h"
 
 #include "Core.h"
 #include "Interfaces/IPluginManager.h"
 #include "Modules/ModuleManager.h"
 #include "ZMQLibrary/zmq.hpp"
 
-#define LOCTEXT_NAMESPACE "FUSConnectorModule"
+#define LOCTEXT_NAMESPACE "FMultiverseConnectorModule"
 
-void FUSConnectorModule::StartupModule()
+void FMultiverseConnectorModule::StartupModule()
 {
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
 
 	// Get the base directory of this plugin
-	FString BaseDir = IPluginManager::Get().FindPlugin("USConnector")->GetBaseDir();
+	FString BaseDir = IPluginManager::Get().FindPlugin("MultiverseConnector")->GetBaseDir();
 
 	// Add on the relative location of the third party dll and load it
 	FString LibraryPath = FPaths::Combine(*BaseDir, TEXT("Binaries/ThirdParty/ZMQLibrary/libzmq.so"));
@@ -35,7 +35,7 @@ void FUSConnectorModule::StartupModule()
 	}
 }
 
-void FUSConnectorModule::ShutdownModule()
+void FMultiverseConnectorModule::ShutdownModule()
 {
 	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
 	// we call this function before unloading the module.
@@ -43,4 +43,4 @@ void FUSConnectorModule::ShutdownModule()
 
 #undef LOCTEXT_NAMESPACE
 
-IMPLEMENT_MODULE(FUSConnectorModule, USConnector)
+IMPLEMENT_MODULE(FMultiverseConnectorModule, MultiverseConnector)
