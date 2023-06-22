@@ -601,6 +601,7 @@ void UMultiverseClientComponent::Deinit()
 
     if (Task.IsValid())
     {
+        zmq_ctx_shutdown(context);
         Task->Wait();
     }
 }
