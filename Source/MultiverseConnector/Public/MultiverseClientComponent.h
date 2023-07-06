@@ -96,7 +96,7 @@ public:
 
 	void Deinit();
 
-	void Tick();
+	void Communicate();
 
 private:
 	UMaterial *GetMaterial(const FLinearColor &Color) const;

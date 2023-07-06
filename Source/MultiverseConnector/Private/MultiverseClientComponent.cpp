@@ -435,7 +435,7 @@ void UMultiverseClientComponent::SendMetaData()
                                                           TStatId(), nullptr, ENamedThreads::AnyThread);
 }
 
-void UMultiverseClientComponent::Tick()
+void UMultiverseClientComponent::Communicate()
 {
     if (IsEnable)
     {
@@ -593,6 +593,8 @@ void UMultiverseClientComponent::Deinit()
         free(receive_buffer);
 
         zmq_disconnect(socket_client, socket_addr.c_str());
+
+        IsEnable = false;
     }
     else
     {

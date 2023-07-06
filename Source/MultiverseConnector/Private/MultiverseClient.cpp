@@ -36,7 +36,7 @@ void AMultiverseClient::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	MultiverseClientComponent->Tick();
+	MultiverseClientComponent->Communicate();
 }
 
 void AMultiverseClient::Init()
