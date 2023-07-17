@@ -22,11 +22,18 @@ public class MultiverseConnector : ModuleRules
         "Json",
         "JsonUtilities",
         "AnimGraphRuntime",
-        "ZMQLibrary"
+        "ZMQLibrary",
+        "MultiverseClientLibrary",
+        "JsonCppLibrary"
       }
       );
 
-    PrivateDependencyModuleNames.AddRange(new string[] { });
+    PrivateDependencyModuleNames.AddRange(
+      new string[] 
+      { 
+        "MultiverseClientLibrary",
+        "JsonCppLibrary"
+      });
 
     // Uncomment if you are using Slate UI
     // PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

@@ -8,9 +8,9 @@
 #include "Engine/StaticMeshActor.h"
 #include "Json.h"
 #include "Math/UnrealMathUtility.h"
-#include "PhysicsEngine/PhysicsConstraintComponent.h"
-#include "MultiverseClient.h"
 #include "MultiverseAnim.h"
+#include "MultiverseClient.h"
+#include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "ZMQLibrary/zmq.hpp"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientComponent, Log, All);
@@ -24,11 +24,10 @@ const TMap<EAttribute, TArray<double>> AttributeMap =
         {EAttribute::JointPosition, {0.0, 0.0, 0.0}},
         {EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
 
-static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
-                        size_t &buffer_size, TSharedPtr<FJsonObject> &MetaDataJson,
-                        const TPair<AActor *, FAttributeContainer> &Object,
-                        TMap<FString, AActor *> &CachedActors,
-                        TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
+static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
+                         const TPair<AActor *, FAttributeContainer> &Object,
+                         TMap<FString, AActor *> &CachedActors,
+                         TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
 {
     if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
     {
@@ -54,9 +53,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                 break;
             }
 
-            DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetActorLabel(), Attribute));
             CachedActors.Add(Object.Key->GetActorLabel(), Object.Key);
-            buffer_size += AttributeMap[Attribute].Num();
         }
 
         FString ObjectName = Object.Key->GetActorLabel();
@@ -82,8 +79,6 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                     {
                         TArray<TSharedPtr<FJsonValue>> AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_rvalue")))};
                         CachedBoneNames.Add(BoneNameStr, TPair<UMultiverseAnim *, FName>(MultiverseAnim, BoneName));
-                        DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointRvalue));
-                        buffer_size += AttributeMap[EAttribute::JointRvalue].Num();
                         MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
                     }
                     else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
@@ -91,9 +86,56 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
                     {
                         TArray<TSharedPtr<FJsonValue>> AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_tvalue")))};
                         CachedBoneNames.Add(BoneNameStr, TPair<UMultiverseAnim *, FName>(MultiverseAnim, BoneName));
-                        DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointTvalue));
-                        buffer_size += AttributeMap[EAttribute::JointTvalue].Num();
                         MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
+                    }
+                }
+            }
+            else
+            {
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetActorLabel())
+            }
+        }
+        else
+        {
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetActorLabel())
+        }
+    }
+}
+
+static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
+                          const TPair<AActor *, FAttributeContainer> &Object)
+{
+    if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
+    {
+        TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+        for (const EAttribute &Attribute : Object.Value.Attributes)
+        {
+            DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetActorLabel(), Attribute));
+        }
+    }
+    else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
+    {
+        if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
+        {
+            if (UMultiverseAnim *MultiverseAnim = Cast<UMultiverseAnim>(SkeletalMeshComponent->GetAnimInstance()))
+            {
+                TArray<FName> BoneNames;
+                SkeletalMeshComponent->GetBoneNames(BoneNames);
+                BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
+                               { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
+                for (const FName &BoneName : BoneNames)
+                {
+                    FString BoneNameStr = BoneName.ToString();
+                    if (((BoneNameStr.EndsWith(TEXT("_revolute_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_revolute_bone"))) ||
+                         (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone")))) &&
+                        Object.Value.Attributes.Contains(EAttribute::JointRvalue))
+                    {
+                        DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointRvalue));
+                    }
+                    else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
+                             Object.Value.Attributes.Contains(EAttribute::JointTvalue))
+                    {
+                        DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointTvalue));
                     }
                 }
             }
@@ -115,7 +157,7 @@ static void SetMetaData(TArray<TPair<FString, EAttribute>> &DataArray,
 UMultiverseClientComponent::UMultiverseClientComponent()
 {
     Host = TEXT("tcp://127.0.0.1");
-    Port = 7500;
+    Port = TEXT("7600");
     ColorMap = {
         {FLinearColor(0, 0, 1, 1), TEXT("Blue")},
         {FLinearColor(0, 1, 1, 1), TEXT("Cyan")},
@@ -134,7 +176,7 @@ UMaterial *UMultiverseClientComponent::GetMaterial(const FLinearColor &Color) co
     return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/MultiverseConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
 }
 
-void UMultiverseClientComponent::Init()
+bool UMultiverseClientComponent::init_objects()
 {
     if (SendObjects.Num() > 0)
     {
@@ -151,7 +193,7 @@ void UMultiverseClientComponent::Init()
     if (World == nullptr)
     {
         UE_LOG(LogMultiverseClientComponent, Error, TEXT("World of %s is nullptr"), *GetName())
-        return;
+        return false;
     }
 
     for (const TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
@@ -243,367 +285,313 @@ void UMultiverseClientComponent::Init()
         }
     }
 
-    if (SendObjects.Num() > 0 || ReceiveObjectRefs.Num() > 0)
+    return SendObjects.Num() > 0 || ReceiveObjectRefs.Num() > 0;
+}
+
+void UMultiverseClientComponent::start_connect_to_server_thread()
+{
+    ConnectToServerTask = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+                                                                         { UMultiverseClientComponent::connect_to_server(); },
+                                                                         TStatId(), nullptr, ENamedThreads::AnyThread);
+}
+
+void UMultiverseClientComponent::wait_for_connect_to_server_thread_finish()
+{
+    if (ConnectToServerTask.IsValid())
     {
-        UE_LOG(LogMultiverseClientComponent, Log, TEXT("Initializing the socket connection..."))
-
-        context = zmq_ctx_new();
-
-        socket_client = zmq_socket(context, ZMQ_REQ);
-        SocketAddr = Host + ":" + FString::FromInt(Port);
-        socket_addr = StringCast<ANSICHAR>(*SocketAddr).Get();
-
-        SendMetaData();
+        ConnectToServerTask->Wait();
     }
 }
 
-void UMultiverseClientComponent::SendMetaData()
+void UMultiverseClientComponent::start_meta_data_thread()
 {
-    zmq_disconnect(socket_client, socket_addr.c_str());
-    zmq_connect(socket_client, socket_addr.c_str());
+    MetaDataTask = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
+                                                                  { UMultiverseClientComponent::send_and_receive_meta_data(); },
+                                                                  TStatId(), nullptr, ENamedThreads::AnyThread);
+}
 
+void UMultiverseClientComponent::wait_for_meta_data_thread_finish()
+{
+    if (MetaDataTask.IsValid())
+    {
+        MetaDataTask->Wait();
+    }
+}
+
+void UMultiverseClientComponent::bind_send_meta_data()
+{
+    TSharedPtr<FJsonObject> SendMetaDataJson = MakeShareable(new FJsonObject);
+    SendMetaDataJson->SetStringField("world", "world");
+    SendMetaDataJson->SetStringField("time_unit", "s");
+    SendMetaDataJson->SetStringField("simulator", "unreal");
+    SendMetaDataJson->SetStringField("length_unit", "cm");
+    SendMetaDataJson->SetStringField("angle_unit", "deg");
+    SendMetaDataJson->SetStringField("handedness", "lhs");
+    SendMetaDataJson->SetStringField("force_unit", "N");
+
+    SendMetaDataJson->SetObjectField("send", MakeShareable(new FJsonObject));
+    SendMetaDataJson->SetObjectField("receive", MakeShareable(new FJsonObject));
+
+    for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
+    {
+        if (SendObject.Key == nullptr)
+        {
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in SendObjects"))
+            continue;
+        }
+
+        BindMetaData(SendMetaDataJson->GetObjectField("send"), SendObject, CachedActors, CachedBoneNames);
+    }
+
+    for (const TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
+    {
+        if (ReceiveObjectRef.Key == nullptr)
+        {
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+            continue;
+        }
+
+        BindMetaData(SendMetaDataJson->GetObjectField("receive"), ReceiveObjectRef, CachedActors, CachedBoneNames);
+    }
+
+    FString SendMetaDataString;
+    TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&SendMetaDataString);
+    FJsonSerializer::Serialize(SendMetaDataJson.ToSharedRef(), Writer, true);
+
+    std::string send_meta_data_string;
+    for (size_t i = 0; i < (SendMetaDataString.Len() + 127) / 128; i++) // Split string into multiple substrings with a length of 128 characters or less
+    {
+        const int32 StartIndex = i * 128;
+        const int32 SubstringLength = FMath::Min(128, SendMetaDataString.Len() - StartIndex);
+        const FString Substring = SendMetaDataString.Mid(StartIndex, SubstringLength);
+        send_meta_data_string += StringCast<ANSICHAR>(*Substring).Get();
+    }
+
+    UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *SendMetaDataString)
+
+    // reader.parse(send_meta_data_string, send_meta_data_json);
+}
+
+void UMultiverseClientComponent::bind_receive_meta_data()
+{
+    // for (const TPair<FString, EAttribute> &SendData : SendDataArray)
+    // {
+    //     const std::string object_name = StringCast<ANSICHAR>(*SendData.Key).Get();
+
+    //     if (CachedActors.Contains(SendData.Key))
+    //     {
+    //         if (CachedActors[SendData.Key] == nullptr)
+    //         {
+    //             UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+    //             continue;
+    //         }
+
+    //         switch (SendData.Value)
+    //         {
+    //         case EAttribute::Position:
+    //         {
+    //             const double X = receive_meta_data_json["send"][object_name]["position"][0].asDouble();
+    //             const double Y = receive_meta_data_json["send"][object_name]["position"][1].asDouble();
+    //             const double Z = receive_meta_data_json["send"][object_name]["position"][2].asDouble();
+    //             CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
+    //             break;
+    //         }
+
+    //         case EAttribute::Quaternion:
+    //         {
+    //             const double W = receive_meta_data_json["send"][object_name]["quaternion"][0].asDouble();
+    //             const double X = receive_meta_data_json["send"][object_name]["quaternion"][1].asDouble();
+    //             const double Y = receive_meta_data_json["send"][object_name]["quaternion"][2].asDouble();
+    //             const double Z = receive_meta_data_json["send"][object_name]["quaternion"][3].asDouble();
+    //             CachedActors[SendData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
+    //             break;
+    //         }
+
+    //         default:
+    //             break;
+    //         }
+    //     }
+    //     else if (CachedBoneNames.Contains(SendData.Key))
+    //     {
+    //         switch (SendData.Value)
+    //         {
+    //         case EAttribute::JointRvalue:
+    //         {
+    //             const double JointRvalue = receive_meta_data_json["send"][object_name]["joint_rvalue"][0].asDouble();
+    //             CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
+    //             break;
+    //         }
+
+    //         case EAttribute::JointTvalue:
+    //         {
+    //             const double JointTvalue = receive_meta_data_json["send"][object_name]["joint_tvalue"][0].asDouble();
+    //             CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
+    //             break;
+    //         }
+
+    //         default:
+    //             break;
+    //         }
+    //     }
+    // }
+}
+
+void UMultiverseClientComponent::init_send_and_receive_data()
+{
+    for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
+    {
+        if (SendObject.Key == nullptr)
+        {
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in SendObjects"))
+            continue;
+        }
+
+        BindDataArray(SendDataArray, SendObject);
+    }
+
+    for (const TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
+    {
+        if (ReceiveObjectRef.Key == nullptr)
+        {
+            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+            continue;
+        }
+
+        BindDataArray(ReceiveDataArray, ReceiveObjectRef);
+    }
+}
+
+void UMultiverseClientComponent::bind_send_data()
+{
+    double *send_buffer_addr = send_buffer + 1;
+
+    for (const TPair<FString, EAttribute> &SendData : SendDataArray)
+    {
+        if (CachedActors.Contains(SendData.Key))
+        {
+            if (CachedActors[SendData.Key] == nullptr)
+            {
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+                continue;
+            }
+
+            switch (SendData.Value)
+            {
+            case EAttribute::Position:
+            {
+                const FVector ActorLocation = CachedActors[SendData.Key]->GetActorLocation();
+                *send_buffer_addr++ = ActorLocation.X;
+                *send_buffer_addr++ = ActorLocation.Y;
+                *send_buffer_addr++ = ActorLocation.Z;
+                break;
+            }
+
+            case EAttribute::Quaternion:
+            {
+                const FQuat ActorQuat = CachedActors[SendData.Key]->GetActorQuat();
+                *send_buffer_addr++ = ActorQuat.W;
+                *send_buffer_addr++ = ActorQuat.X;
+                *send_buffer_addr++ = ActorQuat.Y;
+                *send_buffer_addr++ = ActorQuat.Z;
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+        else if (CachedBoneNames.Contains(SendData.Key))
+        {
+            switch (SendData.Value)
+            {
+            case EAttribute::JointRvalue:
+            {
+                const FQuat JointQuaternion = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetRotation();
+                *send_buffer_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
+                break;
+            }
+
+            case EAttribute::JointTvalue:
+            {
+                const FVector JointPosition = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetTranslation();
+                *send_buffer_addr++ = JointPosition.Y;
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+    }
+}
+
+void UMultiverseClientComponent::bind_receive_data()
+{
+    double *receive_buffer_addr = receive_buffer + 1;
+
+    for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
+    {
+        if (CachedActors.Contains(ReceiveData.Key))
+        {
+            if (CachedActors[ReceiveData.Key] == nullptr)
+            {
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+                continue;
+            }
+
+            switch (ReceiveData.Value)
+            {
+            case EAttribute::Position:
+            {
+                const double X = *receive_buffer_addr++;
+                const double Y = *receive_buffer_addr++;
+                const double Z = *receive_buffer_addr++;
+                CachedActors[ReceiveData.Key]->SetActorLocation(FVector(X, Y, Z));
+                break;
+            }
+
+            case EAttribute::Quaternion:
+            {
+                const double W = *receive_buffer_addr++;
+                const double X = *receive_buffer_addr++;
+                const double Y = *receive_buffer_addr++;
+                const double Z = *receive_buffer_addr++;
+                CachedActors[ReceiveData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+        else if (CachedBoneNames.Contains(ReceiveData.Key))
+        {
+            switch (ReceiveData.Value)
+            {
+            case EAttribute::JointRvalue:
+            {
+                const double JointRvalue = *receive_buffer_addr++;
+                CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
+                break;
+            }
+
+            case EAttribute::JointTvalue:
+            {
+                const double JointTvalue = *receive_buffer_addr++;
+                CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+    }
+}
+
+void UMultiverseClientComponent::clean_up()
+{
     SendDataArray.Empty();
+
     ReceiveDataArray.Empty();
-
-    Task = FFunctionGraphTask::CreateAndDispatchWhenReady([&]()
-                                                          { 
-        TSharedPtr<FJsonObject> MetaDataJson = MakeShareable(new FJsonObject);
-        MetaDataJson->SetStringField("time_unit", "s");
-        MetaDataJson->SetStringField("simulator", "unreal");
-        MetaDataJson->SetStringField("length_unit", "cm");
-        MetaDataJson->SetStringField("angle_unit", "deg");
-        MetaDataJson->SetStringField("handedness", "lhs");
-        MetaDataJson->SetStringField("force_unit", "N");
-
-        TSharedPtr<FJsonObject> MetaDataSendJson = MakeShareable(new FJsonObject);
-        MetaDataJson->SetObjectField("send", MetaDataSendJson);
-
-        send_buffer_size = 1;
-
-        for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
-        {
-            if (SendObject.Key == nullptr)
-            {
-                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in SendObjects"))
-                continue;
-            }
-
-            SetMetaData(SendDataArray, send_buffer_size, MetaDataSendJson, SendObject, CachedActors, CachedBoneNames);
-        }
-
-        TSharedPtr<FJsonObject> MetaDataReceiveJson = MakeShareable(new FJsonObject);
-        MetaDataJson->SetObjectField("receive", MetaDataReceiveJson);
-
-        receive_buffer_size = 1;
-
-        for (const TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
-        {
-            if (ReceiveObjectRef.Key == nullptr)
-            {
-                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
-                continue;
-            }
-
-            SetMetaData(ReceiveDataArray, receive_buffer_size, MetaDataReceiveJson, ReceiveObjectRef, CachedActors, CachedBoneNames);
-        }        
-
-        FString MetaDataString;
-        TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&MetaDataString);
-        FJsonSerializer::Serialize(MetaDataJson.ToSharedRef(), Writer, true);
-
-		double *buffer = (double *)calloc(send_buffer_size + 2, sizeof(double));
-        std::string meta_data_string;
-        for (size_t i = 0; i < (MetaDataString.Len() + 127) / 128; i++) // Split string into multiple substrings with a length of 128 characters or less
-        {
-            const int32 StartIndex = i * 128;
-            const int32 SubstringLength = FMath::Min(128, MetaDataString.Len() - StartIndex);
-            const FString Substring = MetaDataString.Mid(StartIndex, SubstringLength);
-            meta_data_string += StringCast<ANSICHAR>(*Substring).Get();
-        }
-
-        UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *MetaDataString)
-        
-		while (true)
-		{
-			// Send JSON string over ZMQ
-			zmq_send(socket_client, meta_data_string.c_str(), meta_data_string.size(), 0);
-
-			// Receive buffer sizes and send_data (if exists) over ZMQ
-			zmq_recv(socket_client, buffer, (send_buffer_size + 2) * sizeof(double), 0);
-			if (*buffer < 0)
-			{
-				free(buffer);
-				buffer = (double *)calloc(send_buffer_size + 2, sizeof(double));
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("The socket server at %s has been terminated, resend the message"), *SocketAddr);
-				zmq_disconnect(socket_client, socket_addr.c_str());
-                zmq_connect(socket_client, socket_addr.c_str());
-			}
-			else
-			{
-				break;
-			}
-		}
-        
-        size_t recv_buffer_size[2] = {(size_t)buffer[0], (size_t)buffer[1]};
-        if (recv_buffer_size[0] != send_buffer_size || recv_buffer_size[1] != receive_buffer_size)
-        {
-            UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to initialize the socket at %s: send_buffer_size(server = %ld != client = %ld), receive_buffer_size(server = %ld != client = %ld)."), 
-                *SocketAddr, 
-                recv_buffer_size[0], 
-                send_buffer_size, 
-                recv_buffer_size[1], 
-                receive_buffer_size)
-            zmq_disconnect(socket_client, socket_addr.c_str());
-        }
-        else
-        {
-            if (buffer[2] < 0.0)
-            {
-                UE_LOG(LogMultiverseClientComponent, Log, TEXT("Continue state on socket %s"), *SocketAddr)
-
-                double *buffer_addr = buffer + 3;
-
-                for (const TPair<FString, EAttribute> &SendData : SendDataArray)
-                {
-                    if (CachedActors.Contains(SendData.Key))
-                    {
-                        if (CachedActors[SendData.Key] == nullptr)
-                        {
-                            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
-                            continue;
-                        }
-
-                        switch (SendData.Value)
-                        {
-                        case EAttribute::Position:
-                        {
-                            const double X = *buffer_addr++;
-                            const double Y = *buffer_addr++;
-                            const double Z = *buffer_addr++;
-                            UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s - [%f %f %f]"), *SendData.Key, X, Y, Z)
-                            CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
-                            break;
-                        }
-
-                        case EAttribute::Quaternion:
-                        {
-                            const double W = *buffer_addr++;
-                            const double X = *buffer_addr++;
-                            const double Y = *buffer_addr++;
-                            const double Z = *buffer_addr++;
-                            CachedActors[SendData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
-                            break;
-                        }
-
-                        default:
-                            break;
-                        }
-                    }
-                    else if (CachedBoneNames.Contains(SendData.Key))
-                    {
-                        switch (SendData.Value)
-                        {
-                        case EAttribute::JointRvalue:
-                        {
-                            const double JointRvalue = *buffer_addr++;
-                            CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-                            break;
-                        }
-
-                        case EAttribute::JointTvalue:
-                        {
-                            const double JointTvalue = *buffer_addr++;
-                            CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-                            break;
-                        }
-
-                        default:
-                            break;
-                        }
-                    }
-                }
-            }
-
-            UE_LOG(LogMultiverseClientComponent, Log, TEXT("Initialized the socket at %s successfully."), *SocketAddr)
-            UE_LOG(LogMultiverseClientComponent, Log, TEXT("Start communication on %s (send: %ld, receive: %ld)"), *SocketAddr, send_buffer_size, receive_buffer_size)
-            send_buffer = (double *)calloc(send_buffer_size, sizeof(double));
-            receive_buffer = (double *)calloc(receive_buffer_size, sizeof(double));
-            IsEnable = true;
-        }
-        
-        free(buffer); },
-                                                          TStatId(), nullptr, ENamedThreads::AnyThread);
-}
-
-void UMultiverseClientComponent::Communicate()
-{
-    if (IsEnable)
-    {
-        *send_buffer = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-
-        double *send_buffer_addr = send_buffer + 1;
-
-        for (const TPair<FString, EAttribute> &SendData : SendDataArray)
-        {
-            if (CachedActors.Contains(SendData.Key))
-            {
-                if (CachedActors[SendData.Key] == nullptr)
-                {
-                    UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
-                    continue;
-                }
-
-                switch (SendData.Value)
-                {
-                case EAttribute::Position:
-                {
-                    const FVector ActorLocation = CachedActors[SendData.Key]->GetActorLocation();
-                    *send_buffer_addr++ = ActorLocation.X;
-                    *send_buffer_addr++ = ActorLocation.Y;
-                    *send_buffer_addr++ = ActorLocation.Z;
-                    break;
-                }
-
-                case EAttribute::Quaternion:
-                {
-                    const FQuat ActorQuat = CachedActors[SendData.Key]->GetActorQuat();
-                    *send_buffer_addr++ = ActorQuat.W;
-                    *send_buffer_addr++ = ActorQuat.X;
-                    *send_buffer_addr++ = ActorQuat.Y;
-                    *send_buffer_addr++ = ActorQuat.Z;
-                    break;
-                }
-
-                default:
-                    break;
-                }
-            }
-            else if (CachedBoneNames.Contains(SendData.Key))
-            {
-                switch (SendData.Value)
-                {
-                case EAttribute::JointRvalue:
-                {
-                    const FQuat JointQuaternion = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetRotation();
-                    *send_buffer_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
-                    break;
-                }
-
-                case EAttribute::JointTvalue:
-                {
-                    const FVector JointPosition = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetTranslation();
-                    *send_buffer_addr++ = JointPosition.Y;
-                    break;
-                }
-
-                default:
-                    break;
-                }
-            }
-        }
-
-        zmq_send(socket_client, send_buffer, send_buffer_size * sizeof(double), 0);
-
-        zmq_recv(socket_client, receive_buffer, receive_buffer_size * sizeof(double), 0);
-
-        if (*receive_buffer < 0)
-        {
-            IsEnable = false;
-            UE_LOG(LogMultiverseClientComponent, Warning, TEXT("The socket server at %s has been terminated, resend the message"), *SocketAddr)
-            if (Task.IsValid())
-            {
-                Task->Wait();
-            }
-            SendMetaData();
-            return;
-        }
-
-        double *receive_buffer_addr = receive_buffer + 1;
-        for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
-        {
-            if (CachedActors.Contains(ReceiveData.Key))
-            {
-                if (CachedActors[ReceiveData.Key] == nullptr)
-                {
-                    UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
-                    continue;
-                }
-
-                switch (ReceiveData.Value)
-                {
-                case EAttribute::Position:
-                {
-                    const double X = *receive_buffer_addr++;
-                    const double Y = *receive_buffer_addr++;
-                    const double Z = *receive_buffer_addr++;
-                    CachedActors[ReceiveData.Key]->SetActorLocation(FVector(X, Y, Z));
-                    break;
-                }
-
-                case EAttribute::Quaternion:
-                {
-                    const double W = *receive_buffer_addr++;
-                    const double X = *receive_buffer_addr++;
-                    const double Y = *receive_buffer_addr++;
-                    const double Z = *receive_buffer_addr++;
-                    CachedActors[ReceiveData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
-                    break;
-                }
-
-                default:
-                    break;
-                }
-            }
-            else if (CachedBoneNames.Contains(ReceiveData.Key))
-            {
-                switch (ReceiveData.Value)
-                {
-                case EAttribute::JointRvalue:
-                {
-                    const double JointRvalue = *receive_buffer_addr++;
-                    CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-                    break;
-                }
-
-                case EAttribute::JointTvalue:
-                {
-                    const double JointTvalue = *receive_buffer_addr++;
-                    CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-                    break;
-                }
-
-                default:
-                    break;
-                }
-            }
-        }
-    }
-}
-
-void UMultiverseClientComponent::Deinit()
-{
-    UE_LOG(LogMultiverseClientComponent, Log, TEXT("Closing the socket client on %s"), *SocketAddr);
-    if (IsEnable)
-    {
-        const std::string close_data = "{}";
-
-        zmq_send(socket_client, close_data.c_str(), close_data.size(), 0);
-
-        free(send_buffer);
-        free(receive_buffer);
-
-        zmq_disconnect(socket_client, socket_addr.c_str());
-
-        IsEnable = false;
-    }
-    else
-    {
-        zmq_ctx_shutdown(context);
-    }
-
-    if (Task.IsValid())
-    {
-        zmq_ctx_shutdown(context);
-        Task->Wait();
-    }
 }

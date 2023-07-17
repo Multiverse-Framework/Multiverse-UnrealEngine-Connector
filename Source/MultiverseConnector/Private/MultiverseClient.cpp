@@ -26,7 +26,7 @@ void AMultiverseClient::BeginPlay()
 
 void AMultiverseClient::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	MultiverseClientComponent->Deinit();
+	MultiverseClientComponent->disconnect();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -36,10 +36,14 @@ void AMultiverseClient::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	MultiverseClientComponent->Communicate();
+	MultiverseClientComponent->communicate();
 }
 
 void AMultiverseClient::Init()
 {
-	MultiverseClientComponent->Init();
+	MultiverseClientComponent->host = StringCast<ANSICHAR>(*MultiverseClientComponent->Host).Get();
+
+	MultiverseClientComponent->port = StringCast<ANSICHAR>(*MultiverseClientComponent->Port).Get();
+
+	MultiverseClientComponent->connect();
 }

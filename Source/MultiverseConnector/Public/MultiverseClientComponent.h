@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include <string>
+#include "MultiverseClientLibrary/multiverse_client.h"
 
 // clang-format off
 #include "MultiverseClientComponent.generated.h"
@@ -33,7 +34,7 @@ public:
 class ASkeletalMeshActor;
 
 UCLASS(Blueprintable, DefaultToInstanced, collapsecategories, hidecategories = Object, editinlinenew)
-class MULTIVERSECONNECTOR_API UMultiverseClientComponent : public UObject
+class MULTIVERSECONNECTOR_API UMultiverseClientComponent : public UObject, public MultiverseClient
 {
 	GENERATED_BODY()
 
@@ -45,7 +46,7 @@ public:
 	FString Host;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Port;
+	FString Port;
 
 	UPROPERTY(EditAnywhere)
 	TMap<AActor *, FAttributeContainer> SendObjects;
@@ -54,49 +55,46 @@ public:
 	TMap<AActor *, FAttributeContainer> ReceiveObjects;
 
 private:
+	FGraphEventRef ConnectToServerTask;
+
+	FGraphEventRef MetaDataTask;
+
 	TArray<TPair<FString, EAttribute>> SendDataArray;
 
 	TArray<TPair<FString, EAttribute>> ReceiveDataArray;
 
-	void *context;
-
-	void *socket_client;
-
-	size_t send_buffer_size = 1;
-
-	size_t receive_buffer_size = 1;
-
-	double *send_buffer;
-
-	double *receive_buffer;
-
-	FString SocketAddr;
-
-	std::string socket_addr;
-
+private:
 	TMap<AActor *, FAttributeContainer> ReceiveObjectRefs;
-
-	FGraphEventRef Task;
 
 	TMap<FString, AActor *> CachedActors;
 
 	TMap<FString, TPair<class UMultiverseAnim *, FName>> CachedBoneNames;
 
-private:
-	UPROPERTY(VisibleAnywhere)
-	bool IsEnable = false;
-
 	UPROPERTY(EditAnywhere)
 	TMap<FLinearColor, FString> ColorMap;
 
-public:
-	void Init();
+private:
+    void start_connect_to_server_thread() override;
 
-	void SendMetaData();
+    void wait_for_connect_to_server_thread_finish() override;
 
-	void Deinit();
+    void start_meta_data_thread() override;
 
-	void Communicate();
+    void wait_for_meta_data_thread_finish() override;
+
+    bool init_objects() override;
+
+    void bind_send_meta_data() override;
+
+    void bind_receive_meta_data() override;    
+
+    void init_send_and_receive_data() override;
+
+    void bind_send_data() override;
+
+    void bind_receive_data() override;
+
+    void clean_up() override;
 
 private:
 	UMaterial *GetMaterial(const FLinearColor &Color) const;
