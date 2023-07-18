@@ -176,6 +176,32 @@ UMaterial *UMultiverseClientComponent::GetMaterial(const FLinearColor &Color) co
     return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/MultiverseConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
 }
 
+bool UMultiverseClientComponent::compute_receive_meta_data()
+{
+    ReceiveMetaDataJson = MakeShareable(new FJsonObject);
+    if (receive_meta_data_str.empty())
+    {
+        return false;
+    }
+
+    FString ReceiveMetaDataString(receive_meta_data_str.c_str());
+    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ReceiveMetaDataString);
+
+    return FJsonSerializer::Deserialize(Reader, ReceiveMetaDataJson) &&
+           ReceiveMetaDataJson->HasField("time") &&
+           ReceiveMetaDataJson->GetNumberField("time") > 0;
+}
+
+void UMultiverseClientComponent::compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const
+{
+    
+}
+
+void UMultiverseClientComponent::compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const
+{
+
+}
+
 bool UMultiverseClientComponent::init_objects()
 {
     if (SendObjects.Num() > 0)
@@ -320,7 +346,7 @@ void UMultiverseClientComponent::wait_for_meta_data_thread_finish()
 
 void UMultiverseClientComponent::bind_send_meta_data()
 {
-    TSharedPtr<FJsonObject> SendMetaDataJson = MakeShareable(new FJsonObject);
+    SendMetaDataJson = MakeShareable(new FJsonObject);
     SendMetaDataJson->SetStringField("world", "world");
     SendMetaDataJson->SetStringField("time_unit", "s");
     SendMetaDataJson->SetStringField("simulator", "unreal");
@@ -358,82 +384,126 @@ void UMultiverseClientComponent::bind_send_meta_data()
     TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&SendMetaDataString);
     FJsonSerializer::Serialize(SendMetaDataJson.ToSharedRef(), Writer, true);
 
-    std::string send_meta_data_string;
+    send_meta_data_str.clear();
     for (size_t i = 0; i < (SendMetaDataString.Len() + 127) / 128; i++) // Split string into multiple substrings with a length of 128 characters or less
     {
         const int32 StartIndex = i * 128;
         const int32 SubstringLength = FMath::Min(128, SendMetaDataString.Len() - StartIndex);
         const FString Substring = SendMetaDataString.Mid(StartIndex, SubstringLength);
-        send_meta_data_string += StringCast<ANSICHAR>(*Substring).Get();
+        send_meta_data_str += StringCast<ANSICHAR>(*Substring).Get();
     }
 
     UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *SendMetaDataString)
-
-    // reader.parse(send_meta_data_string, send_meta_data_json);
 }
 
 void UMultiverseClientComponent::bind_receive_meta_data()
 {
-    // for (const TPair<FString, EAttribute> &SendData : SendDataArray)
-    // {
-    //     const std::string object_name = StringCast<ANSICHAR>(*SendData.Key).Get();
+    if (!ReceiveMetaDataJson->HasField("send"))
+    {
+        return;
+    }
 
-    //     if (CachedActors.Contains(SendData.Key))
-    //     {
-    //         if (CachedActors[SendData.Key] == nullptr)
-    //         {
-    //             UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
-    //             continue;
-    //         }
+    TSharedPtr<FJsonObject> ResponseSendObjects = ReceiveMetaDataJson->GetObjectField("send");
+    
+    for (const TPair<FString, EAttribute> &SendData : SendDataArray)
+    {
+        if (CachedActors.Contains(SendData.Key))
+        {
+            if (CachedActors[SendData.Key] == nullptr)
+            {
+                UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+                continue;
+            }
 
-    //         switch (SendData.Value)
-    //         {
-    //         case EAttribute::Position:
-    //         {
-    //             const double X = receive_meta_data_json["send"][object_name]["position"][0].asDouble();
-    //             const double Y = receive_meta_data_json["send"][object_name]["position"][1].asDouble();
-    //             const double Z = receive_meta_data_json["send"][object_name]["position"][2].asDouble();
-    //             CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
-    //             break;
-    //         }
+            switch (SendData.Value)
+            {
+            case EAttribute::Position:
+            {
+                if (!ResponseSendObjects->HasField("position"))
+                {
+                    continue;
+                }
 
-    //         case EAttribute::Quaternion:
-    //         {
-    //             const double W = receive_meta_data_json["send"][object_name]["quaternion"][0].asDouble();
-    //             const double X = receive_meta_data_json["send"][object_name]["quaternion"][1].asDouble();
-    //             const double Y = receive_meta_data_json["send"][object_name]["quaternion"][2].asDouble();
-    //             const double Z = receive_meta_data_json["send"][object_name]["quaternion"][3].asDouble();
-    //             CachedActors[SendData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
-    //             break;
-    //         }
+                TArray<TSharedPtr<FJsonValue>> ObjectPosition = ResponseSendObjects->GetArrayField("position");
+                if (ObjectPosition.Num() != 3)
+                {
+                    continue;
+                }
+                
+                const double X = ObjectPosition[0]->AsNumber();
+                const double Y = ObjectPosition[1]->AsNumber();
+                const double Z = ObjectPosition[2]->AsNumber();
+                CachedActors[SendData.Key]->SetActorLocation(FVector(X, Y, Z));
+                break;
+            }
 
-    //         default:
-    //             break;
-    //         }
-    //     }
-    //     else if (CachedBoneNames.Contains(SendData.Key))
-    //     {
-    //         switch (SendData.Value)
-    //         {
-    //         case EAttribute::JointRvalue:
-    //         {
-    //             const double JointRvalue = receive_meta_data_json["send"][object_name]["joint_rvalue"][0].asDouble();
-    //             CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-    //             break;
-    //         }
+            case EAttribute::Quaternion:
+            {
+                if (!ResponseSendObjects->HasField("quaternion"))
+                {
+                    continue;
+                }
 
-    //         case EAttribute::JointTvalue:
-    //         {
-    //             const double JointTvalue = receive_meta_data_json["send"][object_name]["joint_tvalue"][0].asDouble();
-    //             CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-    //             break;
-    //         }
+                TArray<TSharedPtr<FJsonValue>> ObjectQuaternion = ResponseSendObjects->GetArrayField("quaternion");
+                if (ObjectQuaternion.Num() != 4)
+                {
+                    continue;
+                }
 
-    //         default:
-    //             break;
-    //         }
-    //     }
-    // }
+                const double W = ObjectQuaternion[0]->AsNumber();
+                const double X = ObjectQuaternion[1]->AsNumber();
+                const double Y = ObjectQuaternion[2]->AsNumber();
+                const double Z = ObjectQuaternion[3]->AsNumber();
+                CachedActors[SendData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+        else if (CachedBoneNames.Contains(SendData.Key))
+        {
+            switch (SendData.Value)
+            {
+            case EAttribute::JointRvalue:
+            {
+                if (!ResponseSendObjects->HasField("joint_rvalue"))
+                {
+                    continue;
+                }
+
+                TArray<TSharedPtr<FJsonValue>> JointRvalue = ResponseSendObjects->GetArrayField("joint_rvalue");
+                if (JointRvalue.Num() != 1)
+                {
+                    continue;
+                }
+                CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue[0]->AsNumber(), 0.f, 0.f)));
+                break;
+            }
+
+            case EAttribute::JointTvalue:
+            {
+                if (!ResponseSendObjects->HasField("joint_tvalue"))
+                {
+                    continue;
+                }
+
+                TArray<TSharedPtr<FJsonValue>> JointTvalue = ResponseSendObjects->GetArrayField("joint_tvalue");
+                if (JointTvalue.Num() != 1)
+                {
+                    continue;
+                }
+                
+                CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue[0]->AsNumber(), 0.f));
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+    }
 }
 
 void UMultiverseClientComponent::init_send_and_receive_data()

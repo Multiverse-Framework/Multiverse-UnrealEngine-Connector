@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <JsonCppLibrary/jsoncpp/json/json.h>
+#include <string>
 
 enum class EMultiverseClientState : unsigned char;
 
@@ -59,6 +59,11 @@ public:
      */
     virtual double get_time_now();
 
+public:
+    std::string host;
+
+    std::string port;
+
 protected:
     /**
      * @brief Send the meta data and receive the response from server
@@ -75,7 +80,7 @@ protected:
 protected:
     /**
      * @brief Start connect_to_server thread
-     * 
+     *
      */
     virtual void start_connect_to_server_thread() = 0;
 
@@ -110,6 +115,30 @@ protected:
     virtual void bind_send_meta_data() = 0;
 
     /**
+     * @brief Compute receive_meta_data from receive_meta_data_str
+     *
+     * @return true
+     * @return false
+     */
+    virtual bool compute_receive_meta_data() = 0;
+
+    /**
+     * @brief Compute request buffer sizes
+     *
+     * @param send_buffer_size
+     * @param receive_buffer_size
+     */
+    virtual void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const = 0;
+
+    /**
+     * @brief Compute response buffer sizes
+     *
+     * @param send_buffer_size
+     * @param receive_buffer_size
+     */
+    virtual void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const = 0;
+
+    /**
      * @brief Bind the objects from the receive meta data
      *
      */
@@ -117,7 +146,7 @@ protected:
 
     /**
      * @brief Initialize the send and receive data
-     * 
+     *
      */
     virtual void init_send_and_receive_data() = 0;
 
@@ -137,12 +166,7 @@ protected:
      * @brief Clean up pointer
      *
      */
-    virtual void clean_up() = 0;
-
-public:
-    std::string host;
-
-    std::string port;
+    virtual void clean_up() = 0;    
 
 private:
     void run();
@@ -166,15 +190,9 @@ protected:
 
     double *receive_buffer;
 
-    Json::Value send_meta_data_json;
-
     std::string send_meta_data_str;
 
-    Json::Value receive_meta_data_json;
-
     std::string receive_meta_data_str;
-
-    Json::Reader reader;
 
 private:
     std::string socket_addr;

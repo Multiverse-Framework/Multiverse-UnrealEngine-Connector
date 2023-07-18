@@ -24,15 +24,12 @@ public class MultiverseConnector : ModuleRules
         "AnimGraphRuntime",
         "ZMQLibrary",
         "MultiverseClientLibrary",
-        "JsonCppLibrary"
       }
       );
 
     PrivateDependencyModuleNames.AddRange(
       new string[] 
-      { 
-        "MultiverseClientLibrary",
-        "JsonCppLibrary"
+      {
       });
 
     // Uncomment if you are using Slate UI

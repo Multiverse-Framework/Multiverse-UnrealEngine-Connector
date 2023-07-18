@@ -34,7 +34,7 @@ public:
 class ASkeletalMeshActor;
 
 UCLASS(Blueprintable, DefaultToInstanced, collapsecategories, hidecategories = Object, editinlinenew)
-class MULTIVERSECONNECTOR_API UMultiverseClientComponent : public UObject, public MultiverseClient
+class MULTIVERSECONNECTOR_API UMultiverseClientComponent final : public UObject, public MultiverseClient
 {
 	GENERATED_BODY()
 
@@ -55,13 +55,17 @@ public:
 	TMap<AActor *, FAttributeContainer> ReceiveObjects;
 
 private:
-	FGraphEventRef ConnectToServerTask;
+	TSharedPtr<FJsonObject> SendMetaDataJson;
 
-	FGraphEventRef MetaDataTask;
-
+	TSharedPtr<FJsonObject> ReceiveMetaDataJson;
+	
 	TArray<TPair<FString, EAttribute>> SendDataArray;
 
 	TArray<TPair<FString, EAttribute>> ReceiveDataArray;
+
+	FGraphEventRef ConnectToServerTask;
+
+	FGraphEventRef MetaDataTask;
 
 private:
 	TMap<AActor *, FAttributeContainer> ReceiveObjectRefs;
@@ -74,6 +78,12 @@ private:
 	TMap<FLinearColor, FString> ColorMap;
 
 private:
+    bool compute_receive_meta_data() override;
+
+    void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
+
+    void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;
+	
     void start_connect_to_server_thread() override;
 
     void wait_for_connect_to_server_thread_finish() override;
