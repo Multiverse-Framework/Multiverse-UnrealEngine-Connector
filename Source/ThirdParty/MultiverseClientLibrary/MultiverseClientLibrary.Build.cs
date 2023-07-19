@@ -14,7 +14,7 @@ public class MultiverseClientLibrary : ModuleRules
 
 		if (Target.Platform == UnrealTargetPlatform.Linux)
 		{
-			string MultiverseClientSoPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty", "MultiverseClientLibrary", "libmultiverse_client_lib.so");
+			string MultiverseClientSoPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty", "MultiverseClientLibrary", "libmultiverse_client.so");
 			PublicAdditionalLibraries.Add(MultiverseClientSoPath);
 			PublicDelayLoadDLLs.Add(MultiverseClientSoPath);
 			RuntimeDependencies.Add(MultiverseClientSoPath);

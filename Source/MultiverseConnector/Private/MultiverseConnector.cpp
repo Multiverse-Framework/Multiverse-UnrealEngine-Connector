@@ -5,7 +5,10 @@
 #include "Core.h"
 #include "Interfaces/IPluginManager.h"
 #include "Modules/ModuleManager.h"
+
+THIRD_PARTY_INCLUDES_START
 #include "ZMQLibrary/zmq.hpp"
+THIRD_PARTY_INCLUDES_END
 
 #define LOCTEXT_NAMESPACE "FMultiverseConnectorModule"
 
@@ -16,24 +19,22 @@ void FMultiverseConnectorModule::StartupModule()
 	// Get the base directory of this plugin
 	FString BaseDir = IPluginManager::Get().FindPlugin("MultiverseConnector")->GetBaseDir();
 
+	// Add on the relative location of the third party dll and load it
+	FString LibraryPath = FPaths::Combine(*BaseDir, TEXT("Binaries/ThirdParty/ZMQLibrary/libzmq.so"));
+
+	LibraryHandle = !LibraryPath.IsEmpty() ? FPlatformProcess::GetDllHandle(*LibraryPath) : nullptr;
+
+	if (LibraryHandle)
 	{
-		// Add on the relative location of the third party dll and load it
-		FString LibraryPath = FPaths::Combine(*BaseDir, TEXT("Binaries/ThirdParty/ZMQLibrary/libzmq.so"));
-
-		LibraryHandle = !LibraryPath.IsEmpty() ? FPlatformProcess::GetDllHandle(*LibraryPath) : nullptr;
-
-		if (LibraryHandle)
-		{
-			// Call the test function in the third party library
-			zmq::context_t ctx;
-			zmq::socket_t sock(ctx, zmq::socket_type::push);
-			sock.bind("inproc://test");
-			sock.send(zmq::str_buffer("Hello, world"), zmq::send_flags::dontwait);
-		}
-		else
-		{
-			FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("ThirdPartyLibraryError", "Failed to load zmq third party library"));
-		}
+		// Call the test function in the third party library
+		zmq::context_t ctx;
+		zmq::socket_t sock(ctx, zmq::socket_type::push);
+		sock.bind("inproc://test");
+		sock.send(zmq::str_buffer("Hello, world"), zmq::send_flags::dontwait);
+	}
+	else
+	{
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("ThirdPartyLibraryError", "Failed to load zmq third party library"));
 	}
 }
 

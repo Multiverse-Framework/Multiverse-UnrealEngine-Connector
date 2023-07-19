@@ -1,38 +1,102 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
-#include "GameFramework/Actor.h"
-// clang-format off
+#include "CoreMinimal.h"
+THIRD_PARTY_INCLUDES_START
+#include "MultiverseClientLibrary/multiverse_client.h"
+THIRD_PARTY_INCLUDES_END
 #include "MultiverseClient.generated.h"
-// clang-format on
 
-class UMultiverseClientComponent;
+UENUM()
+enum class EAttribute : uint8
+{
+	Position,
+	Quaternion,
+	JointRvalue,
+	JointTvalue,
+	JointPosition,
+	JointQuaternion
+};
 
-UCLASS()
-class MULTIVERSECONNECTOR_API AMultiverseClient : public AActor
+USTRUCT(Blueprintable)
+struct FAttributeContainer
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
-	AMultiverseClient();
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSet<EAttribute> Attributes;
+};
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-	/** Overridable function called whenever this actor is being removed from a level */
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason);
+class MULTIVERSECONNECTOR_API FMultiverseClient : public MultiverseClient
+{
+public:
+	FMultiverseClient();
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	void Init(const FString &InHost, const FString &InPort,
+			  TMap<AActor *, FAttributeContainer> &SendObjects,
+			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
+			  UWorld *World);
 
 private:
-	void Init();
+	TMap<AActor *, FAttributeContainer> SendObjects;
+
+	TMap<AActor *, FAttributeContainer> ReceiveObjects;
+
+	TSharedPtr<FJsonObject> SendMetaDataJson;
+
+	TSharedPtr<FJsonObject> ReceiveMetaDataJson;
+
+	TArray<TPair<FString, EAttribute>> SendDataArray;
+
+	TArray<TPair<FString, EAttribute>> ReceiveDataArray;
+
+	FGraphEventRef ConnectToServerTask;
+
+	FGraphEventRef MetaDataTask;
 
 private:
-	UPROPERTY(VisibleAnywhere, Category = "State Controller")
-	UMultiverseClientComponent *MultiverseClientComponent;
+	UWorld *World;
+
+	TMap<AActor *, FAttributeContainer> ReceiveObjectRefs;
+
+	TMap<FString, AActor *> CachedActors;
+
+	TMap<FString, TPair<class UMultiverseAnim *, FName>> CachedBoneNames;
+
+	TMap<FLinearColor, FString> ColorMap;
+
+private:
+	bool compute_receive_meta_data() override;
+
+	void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
+
+	void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;
+
+	void start_connect_to_server_thread() override;
+
+	void wait_for_connect_to_server_thread_finish() override;
+
+	void start_meta_data_thread() override;
+
+	void wait_for_meta_data_thread_finish() override;
+
+	bool init_objects() override;
+
+	void bind_send_meta_data() override;
+
+	void bind_receive_meta_data() override;
+
+	void init_send_and_receive_data() override;
+
+	void bind_send_data() override;
+
+	void bind_receive_data() override;
+
+	void clean_up() override;
+
+private:
+	UMaterial *GetMaterial(const FLinearColor &Color) const;
 };
