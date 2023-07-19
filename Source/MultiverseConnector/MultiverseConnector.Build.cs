@@ -22,7 +22,6 @@ public class MultiverseConnector : ModuleRules
         "Json",
         "JsonUtilities",
         "AnimGraphRuntime",
-        "ZMQLibrary",
         "MultiverseClientLibrary",
       }
       );

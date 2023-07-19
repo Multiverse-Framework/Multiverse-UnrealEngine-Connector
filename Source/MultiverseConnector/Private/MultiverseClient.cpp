@@ -226,20 +226,20 @@ UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const
 	return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/MultiverseConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
 }
 
-bool FMultiverseClient::compute_receive_meta_data()
+bool FMultiverseClient::compute_response_meta_data()
 {
-	ReceiveMetaDataJson = MakeShareable(new FJsonObject);
-	if (receive_meta_data_str.empty())
+	ResponseMetaDataJson = MakeShareable(new FJsonObject);
+	if (response_meta_data_str.empty())
 	{
 		return false;
 	}
 
-	FString ReceiveMetaDataString(receive_meta_data_str.c_str());
-	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ReceiveMetaDataString);
+	FString ResponseMetaDataString(response_meta_data_str.c_str());
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseMetaDataString);
 
-	return FJsonSerializer::Deserialize(Reader, ReceiveMetaDataJson) &&
-		   ReceiveMetaDataJson->HasField("time") &&
-		   ReceiveMetaDataJson->GetNumberField("time") > 0;
+	return FJsonSerializer::Deserialize(Reader, ResponseMetaDataJson) &&
+		   ResponseMetaDataJson->HasField("time") &&
+		   ResponseMetaDataJson->GetNumberField("time") > 0;
 }
 
 void FMultiverseClient::compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const
@@ -248,12 +248,12 @@ void FMultiverseClient::compute_request_buffer_sizes(size_t &req_send_buffer_siz
 
 	for (TPair<FString, size_t> &RequestBufferSize : RequestBufferSizes)
 	{
-		if (!SendMetaDataJson->HasField(RequestBufferSize.Key))
+		if (!RequestMetaDataJson->HasField(RequestBufferSize.Key))
 		{
 			break;
 		}
 
-		for (const TPair<FString, TSharedPtr<FJsonValue>> &SendObjectJson : SendMetaDataJson->GetObjectField(RequestBufferSize.Key)->Values)
+		for (const TPair<FString, TSharedPtr<FJsonValue>> &SendObjectJson : RequestMetaDataJson->GetObjectField(RequestBufferSize.Key)->Values)
 		{
 			if (SendObjectJson.Key.Compare(TEXT("")) == 0)
 			{
@@ -287,12 +287,12 @@ void FMultiverseClient::compute_response_buffer_sizes(size_t &res_send_buffer_si
 
 	for (TPair<FString, size_t> &ResponseBufferSize : ResponseBufferSizes)
 	{
-		if (!ReceiveMetaDataJson->HasField(ResponseBufferSize.Key))
+		if (!ResponseMetaDataJson->HasField(ResponseBufferSize.Key))
 		{
 			continue;
 		}
 
-		for (const TPair<FString, TSharedPtr<FJsonValue>> &ReceiveObject : ReceiveMetaDataJson->GetObjectField(ResponseBufferSize.Key)->Values)
+		for (const TPair<FString, TSharedPtr<FJsonValue>> &ReceiveObject : ResponseMetaDataJson->GetObjectField(ResponseBufferSize.Key)->Values)
 		{
 			for (const TPair<FString, TSharedPtr<FJsonValue>> &ReceiveObjectData : ReceiveObject.Value->AsObject()->Values)
 			{
@@ -446,19 +446,19 @@ void FMultiverseClient::wait_for_meta_data_thread_finish()
 	}
 }
 
-void FMultiverseClient::bind_send_meta_data()
+void FMultiverseClient::bind_request_meta_data()
 {
-	SendMetaDataJson = MakeShareable(new FJsonObject);
-	SendMetaDataJson->SetStringField(TEXT("world"), TEXT("world"));
-	SendMetaDataJson->SetStringField(TEXT("time_unit"), TEXT("s"));
-	SendMetaDataJson->SetStringField(TEXT("simulator"), TEXT("unreal"));
-	SendMetaDataJson->SetStringField(TEXT("length_unit"), TEXT("cm"));
-	SendMetaDataJson->SetStringField(TEXT("angle_unit"), TEXT("deg"));
-	SendMetaDataJson->SetStringField(TEXT("handedness"), TEXT("lhs"));
-	SendMetaDataJson->SetStringField(TEXT("force_unit"), TEXT("N"));
+	RequestMetaDataJson = MakeShareable(new FJsonObject);
+	RequestMetaDataJson->SetStringField(TEXT("world"), TEXT("world"));
+	RequestMetaDataJson->SetStringField(TEXT("time_unit"), TEXT("s"));
+	RequestMetaDataJson->SetStringField(TEXT("simulator"), TEXT("unreal"));
+	RequestMetaDataJson->SetStringField(TEXT("length_unit"), TEXT("cm"));
+	RequestMetaDataJson->SetStringField(TEXT("angle_unit"), TEXT("deg"));
+	RequestMetaDataJson->SetStringField(TEXT("handedness"), TEXT("lhs"));
+	RequestMetaDataJson->SetStringField(TEXT("force_unit"), TEXT("N"));
 
-	SendMetaDataJson->SetObjectField(TEXT("send"), MakeShareable(new FJsonObject));
-	SendMetaDataJson->SetObjectField(TEXT("receive"), MakeShareable(new FJsonObject));
+	RequestMetaDataJson->SetObjectField(TEXT("send"), MakeShareable(new FJsonObject));
+	RequestMetaDataJson->SetObjectField(TEXT("receive"), MakeShareable(new FJsonObject));
 
 	for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
 	{
@@ -468,7 +468,7 @@ void FMultiverseClient::bind_send_meta_data()
 			continue;
 		}
 
-		BindMetaData(SendMetaDataJson->GetObjectField(TEXT("send")), SendObject, CachedActors, CachedBoneNames);
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("send")), SendObject, CachedActors, CachedBoneNames);
 	}
 
 	for (const TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
@@ -479,33 +479,33 @@ void FMultiverseClient::bind_send_meta_data()
 			continue;
 		}
 
-		BindMetaData(SendMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObjectRef, CachedActors, CachedBoneNames);
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObjectRef, CachedActors, CachedBoneNames);
 	}
 
-	FString SendMetaDataString;
-	TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&SendMetaDataString);
-	FJsonSerializer::Serialize(SendMetaDataJson.ToSharedRef(), Writer, true);
+	FString RequestMetaDataString;
+	TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&RequestMetaDataString);
+	FJsonSerializer::Serialize(RequestMetaDataJson.ToSharedRef(), Writer, true);
 
-	send_meta_data_str.clear();
-	for (size_t i = 0; i < (SendMetaDataString.Len() + 127) / 128; i++) // Split string into multiple substrings with a length of 128 characters or less
+	request_meta_data_str.clear();
+	for (size_t i = 0; i < (RequestMetaDataString.Len() + 127) / 128; i++) // Split string into multiple substrings with a length of 128 characters or less
 	{
 		const int32 StartIndex = i * 128;
-		const int32 SubstringLength = FMath::Min(128, SendMetaDataString.Len() - StartIndex);
-		const FString Substring = SendMetaDataString.Mid(StartIndex, SubstringLength);
-		send_meta_data_str += StringCast<ANSICHAR>(*Substring).Get();
+		const int32 SubstringLength = FMath::Min(128, RequestMetaDataString.Len() - StartIndex);
+		const FString Substring = RequestMetaDataString.Mid(StartIndex, SubstringLength);
+		request_meta_data_str += StringCast<ANSICHAR>(*Substring).Get();
 	}
 
-	UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *SendMetaDataString)
+	UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *RequestMetaDataString)
 }
 
-void FMultiverseClient::bind_receive_meta_data()
+void FMultiverseClient::bind_response_meta_data()
 {
-	if (!ReceiveMetaDataJson->HasField(TEXT("send")))
+	if (!ResponseMetaDataJson->HasField(TEXT("send")))
 	{
 		return;
 	}
 
-	TSharedPtr<FJsonObject> ResponseSendObjects = ReceiveMetaDataJson->GetObjectField(TEXT("send"));
+	TSharedPtr<FJsonObject> ResponseSendObjects = ResponseMetaDataJson->GetObjectField(TEXT("send"));
 
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
 	{
@@ -703,7 +703,6 @@ void FMultiverseClient::bind_receive_data()
 
 	for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
 	{
-		UE_LOG(LogMultiverseClientComponent, Warning, TEXT("ReceiveData - %s"), *ReceiveData.Key)
 		if (CachedActors.Contains(ReceiveData.Key))
 		{
 			if (CachedActors[ReceiveData.Key] == nullptr)
@@ -729,9 +728,7 @@ void FMultiverseClient::bind_receive_data()
 				const double X = *receive_buffer_addr++;
 				const double Y = *receive_buffer_addr++;
 				const double Z = *receive_buffer_addr++;
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Before - %s - %s"), *ReceiveData.Key, *CachedActors[ReceiveData.Key]->GetActorRotation().ToString())
 				CachedActors[ReceiveData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("After - %s - %s"), *ReceiveData.Key, *CachedActors[ReceiveData.Key]->GetActorRotation().ToString())
 				break;
 			}
 

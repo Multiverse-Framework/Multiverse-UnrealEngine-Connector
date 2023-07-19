@@ -45,9 +45,9 @@ private:
 
 	TMap<AActor *, FAttributeContainer> ReceiveObjects;
 
-	TSharedPtr<FJsonObject> SendMetaDataJson;
+	TSharedPtr<FJsonObject> RequestMetaDataJson;
 
-	TSharedPtr<FJsonObject> ReceiveMetaDataJson;
+	TSharedPtr<FJsonObject> ResponseMetaDataJson;
 
 	TArray<TPair<FString, EAttribute>> SendDataArray;
 
@@ -69,7 +69,7 @@ private:
 	TMap<FLinearColor, FString> ColorMap;
 
 private:
-	bool compute_receive_meta_data() override;
+	bool compute_response_meta_data() override;
 
 	void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
 
@@ -85,9 +85,9 @@ private:
 
 	bool init_objects() override;
 
-	void bind_send_meta_data() override;
+	void bind_request_meta_data() override;
 
-	void bind_receive_meta_data() override;
+	void bind_response_meta_data() override;
 
 	void init_send_and_receive_data() override;
 
