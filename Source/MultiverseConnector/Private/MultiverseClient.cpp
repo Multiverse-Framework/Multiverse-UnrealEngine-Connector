@@ -61,14 +61,14 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			}
 		}
 
-		FString ObjectName = Object.Key->GetActorLabel();
+		FString ObjectName = Object.Key->GetName();
 		CachedActors.Add(ObjectName, Object.Key);
 		ObjectName.RemoveFromEnd(TEXT("_ref"));
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 	}
 	else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
 	{
-		
+
 		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
@@ -87,7 +87,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			}
 		}
 
-		FString ObjectName = Object.Key->GetActorLabel();
+		FString ObjectName = Object.Key->GetName();
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 
@@ -121,12 +121,12 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			}
 			else
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetActorLabel())
+				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetName())
 			}
 		}
 		else
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetActorLabel())
+			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetName())
 		}
 	}
 }
@@ -139,21 +139,21 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetActorLabel(), Attribute));
+			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetName(), Attribute));
 		}
 	}
 	else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
 	{
 		if (Object.Value.Attributes.Contains(EAttribute::Position))
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetActorLabel(), EAttribute::Position));
+			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetName(), EAttribute::Position));
 		}
-		
+
 		if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetActorLabel(), EAttribute::Quaternion));
+			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetName(), EAttribute::Quaternion));
 		}
-		
+
 		if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
 		{
 			if (UMultiverseAnim *MultiverseAnim = Cast<UMultiverseAnim>(SkeletalMeshComponent->GetAnimInstance()))
@@ -180,12 +180,12 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			}
 			else
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetActorLabel())
+				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetName())
 			}
 		}
 		else
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetActorLabel())
+			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetName())
 		}
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
@@ -220,8 +220,6 @@ void FMultiverseClient::Init(const FString &Host, const FString &Port,
 	port = TCHAR_TO_UTF8(*Port);
 
 	connect();
-
-	start();
 }
 
 UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const
@@ -314,12 +312,12 @@ bool FMultiverseClient::init_objects()
 	if (SendObjects.Num() > 0)
 	{
 		SendObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-							{ return ActorB.GetActorLabel().Compare(ActorA.GetActorLabel()) > 0; });
+							{ return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
 	}
 	if (ReceiveObjects.Num() > 0)
 	{
 		ReceiveObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-							   { return ActorB.GetActorLabel().Compare(ActorA.GetActorLabel()) > 0; });
+							   { return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
 	}
 
 	if (World == nullptr)
@@ -341,12 +339,12 @@ bool FMultiverseClient::init_objects()
 			UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
 			if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetActorLabel())
+				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetName())
 				continue;
 			}
 			if (!StaticMeshComponent->IsSimulatingPhysics())
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetActorLabel())
+				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetName())
 				StaticMeshComponent->SetSimulatePhysics(true);
 			}
 
@@ -358,7 +356,7 @@ bool FMultiverseClient::init_objects()
 
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Template = StaticMeshActor;
-			SpawnParams.Name = *(ReceiveObject.Key->GetActorLabel() + TEXT("_ref"));
+			SpawnParams.Name = *(ReceiveObject.Key->GetName() + TEXT("_ref"));
 			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			AActor *ReceiveObjectRef = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(), SpawnParams);
 			if (ReceiveObjectRef == nullptr)
@@ -367,7 +365,9 @@ bool FMultiverseClient::init_objects()
 				continue;
 			}
 
+#if WITH_EDITOR
 			ReceiveObjectRef->SetActorLabel(SpawnParams.Name.ToString());
+#endif
 
 			AStaticMeshActor *StaticMeshActorRef = Cast<AStaticMeshActor>(ReceiveObjectRef);
 
