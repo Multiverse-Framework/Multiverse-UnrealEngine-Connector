@@ -218,6 +218,10 @@ void FMultiverseClient::Init(const FString &Host, const FString &Port,
 
 	host = TCHAR_TO_UTF8(*Host);
 	port = TCHAR_TO_UTF8(*Port);
+
+	connect();
+
+	start();
 }
 
 UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const

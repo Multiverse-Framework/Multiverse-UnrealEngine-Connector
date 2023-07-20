@@ -21,9 +21,9 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 
 enum class EMultiverseClientState : unsigned char;
-
 class MultiverseClient
 {
 public:
@@ -40,10 +40,16 @@ public:
     void connect();
 
     /**
+     * @brief start the client
+     * 
+     */
+    void start();
+
+    /**
      * @brief Communicate with the server
      *
      */
-    void communicate(const bool resend_request_meta_data = false);
+    virtual void communicate(const bool resend_request_meta_data = false);
 
     /**
      * @brief Send close signal to the server
@@ -194,14 +200,14 @@ protected:
 
     std::string response_meta_data_str;
 
+    std::atomic<EMultiverseClientState> flag;
+
 private:
     std::string socket_addr;
 
-    EMultiverseClientState flag;
-
     void *context;
 
-    void *socket_client;
+    void *client_socket;
 
     bool should_shut_down = false;
 };
