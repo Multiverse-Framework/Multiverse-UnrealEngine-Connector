@@ -35,7 +35,7 @@ public:
 	FMultiverseClient();
 
 public:
-	void Init(const FString &InHost, const FString &InPort,
+	void Init(const FString &InHost, const FString &ServerPort, const FString &ClientPort,
 			  TMap<AActor *, FAttributeContainer> &SendObjects,
 			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
 			  UWorld *World);

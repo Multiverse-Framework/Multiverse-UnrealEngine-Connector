@@ -31,7 +31,10 @@ public:
 	FString Host;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString Port;
+	FString ServerPort;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString ClientPort;
 
 	UPROPERTY(EditAnywhere)
 	TMap<AActor *, FAttributeContainer> SendObjects;
