@@ -311,15 +311,18 @@ void FMultiverseClient::compute_response_buffer_sizes(size_t &res_send_buffer_si
 
 bool FMultiverseClient::init_objects()
 {
+	SendObjects.Remove(nullptr);
+	ReceiveObjects.Remove(nullptr);
+	
 	if (SendObjects.Num() > 0)
 	{
 		SendObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-							{ return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
+							{	return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
 	}
 	if (ReceiveObjects.Num() > 0)
 	{
 		ReceiveObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-							   { return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
+								{	return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
 	}
 
 	if (World == nullptr)
