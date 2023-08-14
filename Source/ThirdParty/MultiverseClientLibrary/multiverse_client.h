@@ -27,6 +27,9 @@ enum class EMultiverseClientState : unsigned char;
 class MultiverseClient
 {
 public:
+    virtual ~MultiverseClient() = default;
+
+public:
     /**
      * @brief Connect the socket with host and port
      *
