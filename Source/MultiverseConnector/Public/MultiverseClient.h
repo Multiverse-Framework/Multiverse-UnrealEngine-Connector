@@ -26,7 +26,7 @@ struct FAttributeContainer
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSet<EAttribute> Attributes;
+	TArray<EAttribute> Attributes;
 };
 
 class MULTIVERSECONNECTOR_API FMultiverseClient : public MultiverseClient

@@ -12,16 +12,34 @@ UMultiverseClientComponent::UMultiverseClientComponent()
 }
 
 void UMultiverseClientComponent::Init()
-{   
+{
+
+#if WITH_EDITOR
+    for (TPair<AActor *, FAttributeContainer> SendObject : SendObjects)
+    {
+        if (SendObject.Key != nullptr)
+        {
+            SendObject.Key->Rename(*SendObject.Key->GetActorLabel());
+        }
+    }
+    for (TPair<AActor *, FAttributeContainer> ReceiveObject : ReceiveObjects)
+    {
+        if (ReceiveObject.Key != nullptr)
+        {
+            ReceiveObject.Key->Rename(*ReceiveObject.Key->GetActorLabel());
+        }
+    }
+#endif
+
     MultiverseClient.Init(Host, ServerPort, ClientPort, SendObjects, ReceiveObjects, GetWorld());
 }
 
 void UMultiverseClientComponent::Tick()
-{   
+{
     MultiverseClient.communicate();
 }
 
 void UMultiverseClientComponent::Deinit()
-{   
+{
     MultiverseClient.disconnect();
 }
