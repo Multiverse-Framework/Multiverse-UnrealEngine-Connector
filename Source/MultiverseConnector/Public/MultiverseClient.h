@@ -11,12 +11,12 @@ THIRD_PARTY_INCLUDES_END
 UENUM()
 enum class EAttribute : uint8
 {
-	Position,
-	Quaternion,
+	JointPosition,
+	JointQuaternion,
 	JointRvalue,
 	JointTvalue,
-	JointPosition,
-	JointQuaternion
+	Position,
+	Quaternion
 };
 
 USTRUCT(Blueprintable)
@@ -25,6 +25,9 @@ struct FAttributeContainer
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString ObjectName;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EAttribute> Attributes;
 };
