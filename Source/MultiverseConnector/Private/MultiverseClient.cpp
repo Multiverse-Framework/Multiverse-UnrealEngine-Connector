@@ -98,7 +98,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				TArray<FName> BoneNames;
 				SkeletalMeshComponent->GetBoneNames(BoneNames);
 				BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
-							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
+							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) >= 0; });
 				for (const FName &BoneName : BoneNames)
 				{
 					FString BoneNameStr = BoneName.ToString();
@@ -161,7 +161,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				TArray<FName> BoneNames;
 				SkeletalMeshComponent->GetBoneNames(BoneNames);
 				BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
-							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
+							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) >= 0; });
 				for (const FName &BoneName : BoneNames)
 				{
 					FString BoneNameStr = BoneName.ToString();
@@ -189,7 +189,9 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		}
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
-					   { return DataB.Key.Compare(DataA.Key) >= 0 && DataA <= DataB; });
+					   { return DataB.Key.Compare(DataA.Key) >= 0; }); // A1 A2 B2 B1
+		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
+					   { return DataB.Key.Compare(DataA.Key) == 0 && DataB.Value >= DataA.Value; }); // A1 A2 B1 B2
 	}
 }
 
@@ -317,12 +319,12 @@ bool FMultiverseClient::init_objects()
 	if (SendObjects.Num() > 0)
 	{
 		SendObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
-							{ return AttributeContainerA.ObjectName.Compare(AttributeContainerB.ObjectName) >= 0; });
+							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) >= 0; });
 	}
 	if (ReceiveObjects.Num() > 0)
 	{
 		ReceiveObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
-							{ return AttributeContainerA.ObjectName.Compare(AttributeContainerB.ObjectName) >= 0; });
+							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) >= 0; });
 	}
 
 	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
