@@ -98,7 +98,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				TArray<FName> BoneNames;
 				SkeletalMeshComponent->GetBoneNames(BoneNames);
 				BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
-							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) >= 0; });
+							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
 				for (const FName &BoneName : BoneNames)
 				{
 					FString BoneNameStr = BoneName.ToString();
@@ -161,7 +161,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				TArray<FName> BoneNames;
 				SkeletalMeshComponent->GetBoneNames(BoneNames);
 				BoneNames.Sort([](const FName &BoneNameA, const FName &BoneNameB)
-							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) >= 0; });
+							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
 				for (const FName &BoneName : BoneNames)
 				{
 					FString BoneNameStr = BoneName.ToString();
@@ -189,9 +189,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		}
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
-					   { return DataB.Key.Compare(DataA.Key) >= 0; }); // A1 A2 B2 B1
-		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
-					   { return DataB.Key.Compare(DataA.Key) == 0 && DataB.Value >= DataA.Value; }); // A1 A2 B1 B2
+					   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
 	}
 }
 
@@ -319,23 +317,23 @@ bool FMultiverseClient::init_objects()
 	if (SendObjects.Num() > 0)
 	{
 		SendObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
-							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) >= 0; });
+							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
 	}
 	if (ReceiveObjects.Num() > 0)
 	{
 		ReceiveObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
-							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) >= 0; });
+							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
 	}
 
 	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
 	{
 		SendObject.Value.Attributes.Sort([](const EAttribute &AttributeA, const EAttribute &AttributeB)
-										 { return AttributeA < AttributeB; });
+										 { return AttributeB > AttributeA; });
 	}
 	for (TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
 	{
 		ReceiveObject.Value.Attributes.Sort([](const EAttribute &AttributeA, const EAttribute &AttributeB)
-											{ return AttributeA < AttributeB; });
+											{ return AttributeB > AttributeA; });
 	}
 
 	if (World == nullptr)
@@ -724,7 +722,7 @@ void FMultiverseClient::bind_send_data()
 void FMultiverseClient::bind_receive_data()
 {
 	double *receive_buffer_addr = receive_buffer + 1;
-
+	UE_LOG(LogMultiverseClient, Log, TEXT("------------------------------------"))
 	for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
 	{
 		if (CachedActors.Contains(ReceiveData.Key))
@@ -768,6 +766,7 @@ void FMultiverseClient::bind_receive_data()
 			{
 				const double JointRvalue = *receive_buffer_addr++;
 				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
+				UE_LOG(LogMultiverseClient, Log, TEXT("RValue %s - %f"), *ReceiveData.Key, JointRvalue)
 				break;
 			}
 
@@ -775,6 +774,7 @@ void FMultiverseClient::bind_receive_data()
 			{
 				const double JointTvalue = *receive_buffer_addr++;
 				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
+				UE_LOG(LogMultiverseClient, Log, TEXT("TValue %s - %f"), *ReceiveData.Key, JointTvalue)
 				break;
 			}
 
