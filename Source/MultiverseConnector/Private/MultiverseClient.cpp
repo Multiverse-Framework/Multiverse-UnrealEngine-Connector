@@ -722,7 +722,6 @@ void FMultiverseClient::bind_send_data()
 void FMultiverseClient::bind_receive_data()
 {
 	double *receive_buffer_addr = receive_buffer + 1;
-	UE_LOG(LogMultiverseClient, Log, TEXT("------------------------------------"))
 	for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
 	{
 		if (CachedActors.Contains(ReceiveData.Key))
@@ -766,7 +765,6 @@ void FMultiverseClient::bind_receive_data()
 			{
 				const double JointRvalue = *receive_buffer_addr++;
 				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-				UE_LOG(LogMultiverseClient, Log, TEXT("RValue %s - %f"), *ReceiveData.Key, JointRvalue)
 				break;
 			}
 
@@ -774,7 +772,6 @@ void FMultiverseClient::bind_receive_data()
 			{
 				const double JointTvalue = *receive_buffer_addr++;
 				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-				UE_LOG(LogMultiverseClient, Log, TEXT("TValue %s - %f"), *ReceiveData.Key, JointTvalue)
 				break;
 			}
 
