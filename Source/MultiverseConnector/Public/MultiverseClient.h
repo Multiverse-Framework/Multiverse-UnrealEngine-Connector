@@ -36,6 +36,7 @@ public:
 
 public:
 	void Init(const FString &InHost, const FString &ServerPort, const FString &ClientPort,
+			  const FString &InWorldName, const FString &InSimulationName,
 			  TMap<AActor *, FAttributeContainer> &SendObjects,
 			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
 			  UWorld *World);
@@ -60,6 +61,10 @@ private:
 private:
 	UWorld *World;
 
+	FString WorldName;
+
+	FString SimulationName;
+
 	TMap<AActor *, FAttributeContainer> ReceiveObjectRefs;
 
 	TMap<FString, AActor *> CachedActors;
@@ -83,7 +88,7 @@ private:
 
 	void wait_for_meta_data_thread_finish() override;
 
-	bool init_objects() override;
+	bool init_objects(bool from_server = false) override;
 
 	void bind_request_meta_data() override;
 
@@ -96,6 +101,8 @@ private:
 	void bind_receive_data() override;
 
 	void clean_up() override;
+
+	void reset() override;
 
 private:
 	UMaterial *GetMaterial(const FLinearColor &Color) const;

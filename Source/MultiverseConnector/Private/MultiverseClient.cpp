@@ -208,6 +208,7 @@ FMultiverseClient::FMultiverseClient()
 }
 
 void FMultiverseClient::Init(const FString &Host, const FString &ServerPort, const FString &ClientPort,
+							 const FString &InWorldName, const FString &InSimulationName,
 							 TMap<AActor *, FAttributeContainer> &InSendObjects,
 							 TMap<AActor *, FAttributeContainer> &InReceiveObjects,
 							 UWorld *InWorld)
@@ -215,6 +216,8 @@ void FMultiverseClient::Init(const FString &Host, const FString &ServerPort, con
 	SendObjects = InSendObjects;
 	ReceiveObjects = InReceiveObjects;
 	World = InWorld;
+	WorldName = InWorldName;
+	SimulationName = InSimulationName;
 
 	host = TCHAR_TO_UTF8(*Host);
 	port = TCHAR_TO_UTF8(*ClientPort);
@@ -309,7 +312,7 @@ void FMultiverseClient::compute_response_buffer_sizes(size_t &res_send_buffer_si
 	res_receive_buffer_size = ResponseBufferSizes[TEXT("receive")];
 }
 
-bool FMultiverseClient::init_objects()
+bool FMultiverseClient::init_objects(bool from_server)
 {
 	SendObjects.Remove(nullptr);
 	ReceiveObjects.Remove(nullptr);
@@ -458,9 +461,9 @@ void FMultiverseClient::wait_for_meta_data_thread_finish()
 void FMultiverseClient::bind_request_meta_data()
 {
 	RequestMetaDataJson = MakeShareable(new FJsonObject);
-	RequestMetaDataJson->SetStringField(TEXT("world"), TEXT("world"));
+	RequestMetaDataJson->SetStringField(TEXT("world_name"), WorldName);
+	RequestMetaDataJson->SetStringField(TEXT("simulation_name"), SimulationName);
 	RequestMetaDataJson->SetStringField(TEXT("time_unit"), TEXT("s"));
-	RequestMetaDataJson->SetStringField(TEXT("simulator"), TEXT("unreal"));
 	RequestMetaDataJson->SetStringField(TEXT("length_unit"), TEXT("cm"));
 	RequestMetaDataJson->SetStringField(TEXT("angle_unit"), TEXT("deg"));
 	RequestMetaDataJson->SetStringField(TEXT("handedness"), TEXT("lhs"));
@@ -775,4 +778,9 @@ void FMultiverseClient::clean_up()
 	SendDataArray.Empty();
 
 	ReceiveDataArray.Empty();
+}
+
+void FMultiverseClient::reset()
+{
+	
 }

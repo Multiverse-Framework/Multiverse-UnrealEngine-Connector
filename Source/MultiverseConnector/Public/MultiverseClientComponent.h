@@ -36,6 +36,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString ClientPort;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString WorldName = TEXT("world");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString SimulationName = TEXT("unreal");
+
 	UPROPERTY(EditAnywhere)
 	TMap<AActor *, FAttributeContainer> SendObjects;
 
