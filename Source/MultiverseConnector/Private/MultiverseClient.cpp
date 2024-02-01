@@ -208,6 +208,7 @@ FMultiverseClient::FMultiverseClient()
 }
 
 void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
+							 const FString &InWorldName, const FString &InSimulationName,
 							 TMap<AActor *, FAttributeContainer> &InSendObjects,
 							 TMap<AActor *, FAttributeContainer> &InReceiveObjects,
 							 UWorld *InWorld)

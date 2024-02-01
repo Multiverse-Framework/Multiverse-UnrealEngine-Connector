@@ -39,6 +39,7 @@ public:
 
 public:
 	void Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
+			  const FString &WorldName, const FString &SimulationName,
 			  TMap<AActor *, FAttributeContainer> &SendObjects,
 			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
 			  UWorld *World);

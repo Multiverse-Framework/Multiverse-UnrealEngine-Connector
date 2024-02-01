@@ -6,7 +6,7 @@
 
 UMultiverseClientComponent::UMultiverseClientComponent()
 {
-    Host = TEXT("tcp://127.0.0.1");
+    ServerHost = TEXT("tcp://127.0.0.1");
     ServerPort = TEXT("7000");
     ClientPort = TEXT("7600");
 }

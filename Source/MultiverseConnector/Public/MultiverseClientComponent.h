@@ -28,7 +28,7 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString Host;
+	FString ServerHost;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString ServerPort;
