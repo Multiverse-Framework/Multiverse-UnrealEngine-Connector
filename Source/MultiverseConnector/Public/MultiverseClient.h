@@ -11,12 +11,12 @@ THIRD_PARTY_INCLUDES_END
 UENUM()
 enum class EAttribute : uint8
 {
-	Position,
-	Quaternion,
+	JointPosition,
+	JointQuaternion,
 	JointRvalue,
 	JointTvalue,
-	JointPosition,
-	JointQuaternion
+	Position,
+	Quaternion
 };
 
 USTRUCT(Blueprintable)
@@ -26,7 +26,10 @@ struct FAttributeContainer
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSet<EAttribute> Attributes;
+	FString ObjectName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<EAttribute> Attributes;
 };
 
 class MULTIVERSECONNECTOR_API FMultiverseClient : public MultiverseClient
@@ -35,8 +38,7 @@ public:
 	FMultiverseClient();
 
 public:
-	void Init(const FString &InHost, const FString &ServerPort, const FString &ClientPort,
-			  const FString &InWorldName, const FString &InSimulationName,
+	void Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
 			  TMap<AActor *, FAttributeContainer> &SendObjects,
 			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
 			  UWorld *World);

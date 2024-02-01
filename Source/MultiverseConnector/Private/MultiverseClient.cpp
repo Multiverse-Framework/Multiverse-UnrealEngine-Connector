@@ -11,7 +11,7 @@
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include <chrono>
 
-DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientComponent, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
 
 const TMap<EAttribute, TArray<double>> AttributeDataMap =
 	{
@@ -61,7 +61,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			}
 		}
 
-		FString ObjectName = Object.Key->GetName();
+		FString ObjectName = Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		ObjectName.RemoveFromEnd(TEXT("_ref"));
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
@@ -87,7 +87,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			}
 		}
 
-		FString ObjectName = Object.Key->GetName();
+		FString ObjectName = Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 
@@ -121,12 +121,12 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			}
 			else
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetName())
+				UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *Object.Value.ObjectName)
 			}
 		}
 		else
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetName())
+			UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *Object.Value.ObjectName)
 		}
 	}
 }
@@ -139,19 +139,19 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetName(), Attribute));
+			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
 		}
 	}
 	else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
 	{
 		if (Object.Value.Attributes.Contains(EAttribute::Position))
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetName(), EAttribute::Position));
+			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Position));
 		}
 
 		if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Key->GetName(), EAttribute::Quaternion));
+			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Quaternion));
 		}
 
 		if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
@@ -180,16 +180,16 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			}
 			else
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *SkeletalMeshActor->GetName())
+				UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a MultiverseAnim."), *Object.Value.ObjectName)
 			}
 		}
 		else
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *SkeletalMeshActor->GetName())
+			UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *Object.Value.ObjectName)
 		}
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
-					   { return DataB.Key.Compare(DataA.Key) > 0; });
+					   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
 	}
 }
 
@@ -207,8 +207,7 @@ FMultiverseClient::FMultiverseClient()
 		{FLinearColor(0.1, 0.1, 0.1, 1), TEXT("Gray")}};
 }
 
-void FMultiverseClient::Init(const FString &Host, const FString &ServerPort, const FString &ClientPort,
-							 const FString &InWorldName, const FString &InSimulationName,
+void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
 							 TMap<AActor *, FAttributeContainer> &InSendObjects,
 							 TMap<AActor *, FAttributeContainer> &InReceiveObjects,
 							 UWorld *InWorld)
@@ -219,10 +218,10 @@ void FMultiverseClient::Init(const FString &Host, const FString &ServerPort, con
 	WorldName = InWorldName;
 	SimulationName = InSimulationName;
 
-	host = TCHAR_TO_UTF8(*Host);
-	port = TCHAR_TO_UTF8(*ClientPort);
-
+	host = TCHAR_TO_UTF8(*ServerHost);
 	server_socket_addr = host + ":" + TCHAR_TO_UTF8(*ServerPort);
+
+	port = TCHAR_TO_UTF8(*ClientPort);
 
 	connect();
 }
@@ -316,21 +315,32 @@ bool FMultiverseClient::init_objects(bool from_server)
 {
 	SendObjects.Remove(nullptr);
 	ReceiveObjects.Remove(nullptr);
-	
+
 	if (SendObjects.Num() > 0)
 	{
-		SendObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-							{	return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
+		SendObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
+							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
 	}
 	if (ReceiveObjects.Num() > 0)
 	{
-		ReceiveObjects.KeySort([](const AActor &ActorA, const AActor &ActorB)
-								{	return ActorB.GetName().Compare(ActorA.GetName()) > 0; });
+		ReceiveObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
+							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
+	}
+
+	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
+	{
+		SendObject.Value.Attributes.Sort([](const EAttribute &AttributeA, const EAttribute &AttributeB)
+										 { return AttributeB > AttributeA; });
+	}
+	for (TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
+	{
+		ReceiveObject.Value.Attributes.Sort([](const EAttribute &AttributeA, const EAttribute &AttributeB)
+											{ return AttributeB > AttributeA; });
 	}
 
 	if (World == nullptr)
 	{
-		UE_LOG(LogMultiverseClientComponent, Error, TEXT("World is nullptr"))
+		UE_LOG(LogMultiverseClient, Error, TEXT("World is nullptr"))
 		return false;
 	}
 
@@ -338,7 +348,7 @@ bool FMultiverseClient::init_objects(bool from_server)
 	{
 		if (ReceiveObject.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjects."))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjects."))
 			continue;
 		}
 
@@ -347,29 +357,30 @@ bool FMultiverseClient::init_objects(bool from_server)
 			UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
 			if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Key->GetName())
+				UE_LOG(LogMultiverseClient, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Value.ObjectName)
 				continue;
 			}
 			if (!StaticMeshComponent->IsSimulatingPhysics())
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Key->GetName())
+				UE_LOG(LogMultiverseClient, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Value.ObjectName)
 				StaticMeshComponent->SetSimulatePhysics(true);
 			}
 
-			UMaterial *RedMaterial = GetMaterial(FLinearColor(1, 0, 0, 1));
-			for (int32 i = 0; i < StaticMeshComponent->GetMaterials().Num(); i++)
-			{
-				StaticMeshComponent->SetMaterial(i, RedMaterial);
-			}
+			StaticMeshComponent->SetVisibility(false);
+			// UMaterial *RedMaterial = GetMaterial(FLinearColor(1, 0, 0, 1));
+			// for (int32 i = 0; i < StaticMeshComponent->GetMaterials().Num(); i++)
+			// {
+			// 	StaticMeshComponent->SetMaterial(i, RedMaterial);
+			// }
 
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Template = StaticMeshActor;
-			SpawnParams.Name = *(ReceiveObject.Key->GetName() + TEXT("_ref"));
+			SpawnParams.Name = *(ReceiveObject.Value.ObjectName + TEXT("_ref"));
 			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			AActor *ReceiveObjectRef = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(), SpawnParams);
 			if (ReceiveObjectRef == nullptr)
 			{
-				UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
+				UE_LOG(LogMultiverseClient, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
 				continue;
 			}
 
@@ -383,11 +394,12 @@ bool FMultiverseClient::init_objects(bool from_server)
 			StaticMeshComponentRef->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 			StaticMeshComponentRef->SetSimulatePhysics(false);
 
-			UMaterial *GrayMaterial = GetMaterial(FLinearColor(0.1, 0.1, 0.1, 1));
-			for (int32 i = 0; i < StaticMeshComponentRef->GetMaterials().Num(); i++)
-			{
-				StaticMeshComponentRef->SetMaterial(i, GrayMaterial);
-			}
+			StaticMeshComponentRef->SetVisibility(true);
+			// UMaterial *GrayMaterial = GetMaterial(FLinearColor(0.1, 0.1, 0.1, 1));
+			// for (int32 i = 0; i < StaticMeshComponentRef->GetMaterials().Num(); i++)
+			// {
+			// 	StaticMeshComponentRef->SetMaterial(i, GrayMaterial);
+			// }
 
 			UPhysicsConstraintComponent *PhysicsConstraint = NewObject<UPhysicsConstraintComponent>(StaticMeshActorRef);
 			PhysicsConstraint->AttachToComponent(StaticMeshComponentRef, FAttachmentTransformRules::KeepWorldTransform);
@@ -476,7 +488,7 @@ void FMultiverseClient::bind_request_meta_data()
 	{
 		if (SendObject.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in SendObjects"))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in SendObjects"))
 			continue;
 		}
 
@@ -487,7 +499,7 @@ void FMultiverseClient::bind_request_meta_data()
 	{
 		if (ReceiveObjectRef.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
 			continue;
 		}
 
@@ -507,7 +519,7 @@ void FMultiverseClient::bind_request_meta_data()
 		request_meta_data_str += StringCast<ANSICHAR>(*Substring).Get();
 	}
 
-	UE_LOG(LogMultiverseClientComponent, Log, TEXT("%s"), *RequestMetaDataString)
+	UE_LOG(LogMultiverseClient, Log, TEXT("%s"), *RequestMetaDataString)
 }
 
 void FMultiverseClient::bind_response_meta_data()
@@ -525,7 +537,7 @@ void FMultiverseClient::bind_response_meta_data()
 		{
 			if (CachedActors[SendData.Key] == nullptr)
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in CachedActors"))
 				continue;
 			}
 
@@ -622,22 +634,22 @@ void FMultiverseClient::bind_response_meta_data()
 
 void FMultiverseClient::init_send_and_receive_data()
 {
-	for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
+	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
 	{
 		if (SendObject.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in SendObjects"))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in SendObjects"))
 			continue;
 		}
 
 		BindDataArray(SendDataArray, SendObject);
 	}
 
-	for (const TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
+	for (TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
 	{
 		if (ReceiveObjectRef.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
 			continue;
 		}
 
@@ -655,7 +667,7 @@ void FMultiverseClient::bind_send_data()
 		{
 			if (CachedActors[SendData.Key] == nullptr)
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in CachedActors"))
 				continue;
 			}
 
@@ -712,14 +724,13 @@ void FMultiverseClient::bind_send_data()
 void FMultiverseClient::bind_receive_data()
 {
 	double *receive_buffer_addr = receive_buffer + 1;
-
 	for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
 	{
 		if (CachedActors.Contains(ReceiveData.Key))
 		{
 			if (CachedActors[ReceiveData.Key] == nullptr)
 			{
-				UE_LOG(LogMultiverseClientComponent, Warning, TEXT("Ignore None Object in CachedActors"))
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in CachedActors"))
 				continue;
 			}
 

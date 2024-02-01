@@ -13,15 +13,15 @@ UMultiverseClientComponent::UMultiverseClientComponent()
 
 void UMultiverseClientComponent::Init()
 {   
-    MultiverseClient.Init(Host, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
+    MultiverseClient.Init(ServerHost, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
 }
 
 void UMultiverseClientComponent::Tick()
-{   
+{
     MultiverseClient.communicate();
 }
 
 void UMultiverseClientComponent::Deinit()
-{   
+{
     MultiverseClient.disconnect();
 }

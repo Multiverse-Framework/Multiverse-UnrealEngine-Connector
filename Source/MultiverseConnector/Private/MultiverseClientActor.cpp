@@ -5,7 +5,7 @@
 #include "Animation/SkeletalMeshActor.h"
 #include "MultiverseClientComponent.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientActor, Log, All);
 
 // Sets default values
 AMultiverseClientActor::AMultiverseClientActor()
