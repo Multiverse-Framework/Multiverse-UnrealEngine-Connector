@@ -1,4 +1,4 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2022, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 using System.IO;
 using UnrealBuildTool;

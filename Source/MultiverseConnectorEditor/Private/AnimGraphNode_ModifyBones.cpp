@@ -1,23 +1,23 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2022, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 #include "AnimGraphNode_ModifyBones.h"
 
 #define LOCTEXT_NAMESPACE "A3Nodes"
 
-UAnimGraphNode_ModifyBones::UAnimGraphNode_ModifyBones(const FObjectInitializer &ObjectInitializer)
-		: Super(ObjectInitializer)
+UAnimGraphNode_ModifyBones::UAnimGraphNode_ModifyBones(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 }
 
 FEditorModeID UAnimGraphNode_ModifyBones::GetEditorMode() const
 {
-	FEditorModeID ModifyBones("AnimGraph.SkeletalControl.ModifyBones");
+	const FEditorModeID ModifyBones("AnimGraph.SkeletalControl.ModifyBones");
 	return ModifyBones;
 }
 
-void UAnimGraphNode_ModifyBones::CopyNodeDataToPreviewNode(FAnimNode_Base *InPreviewNode)
+void UAnimGraphNode_ModifyBones::CopyNodeDataToPreviewNode(FAnimNode_Base* InPreviewNode)
 {
-	FAnimNode_ModifyBones *ModifyBones = static_cast<FAnimNode_ModifyBones *>(InPreviewNode);
+	FAnimNode_ModifyBones* ModifyBones = static_cast<FAnimNode_ModifyBones*>(InPreviewNode);
 
 	ModifyBones->JointPoses = Node.JointPoses;
 }
@@ -29,7 +29,8 @@ FText UAnimGraphNode_ModifyBones::GetControllerDescription() const
 
 FText UAnimGraphNode_ModifyBones::GetTooltipText() const
 {
-	return LOCTEXT("AnimGraphNode_ModifyBones_Tooltip", "The Transform Bones node alters the transform - i.e. Translation, Rotation, or Scale - of the bones");
+	return LOCTEXT("AnimGraphNode_ModifyBones_Tooltip",
+	               "The Transform Bones node alters the transform - i.e. Translation, Rotation, or Scale - of the bones");
 }
 
 FText UAnimGraphNode_ModifyBones::GetNodeTitle(ENodeTitleType::Type TitleType) const

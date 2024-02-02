@@ -1,4 +1,4 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2022, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 #pragma once
 
@@ -33,11 +33,11 @@ public:
 protected:
 	// UAnimGraphNode_Base interface
 	virtual FEditorModeID GetEditorMode() const override;
-	virtual void CopyNodeDataToPreviewNode(FAnimNode_Base *InPreviewNode) override;
+	virtual void CopyNodeDataToPreviewNode(FAnimNode_Base* InPreviewNode) override;
 	// End of UAnimGraphNode_Base interface
 
 	// UAnimGraphNode_SkeletalControlBase interface
 	virtual FText GetControllerDescription() const override;
-	virtual const FAnimNode_SkeletalControlBase *GetNode() const override { return &Node; }
+	virtual const FAnimNode_SkeletalControlBase* GetNode() const override { return &Node; }
 	// End of UAnimGraphNode_SkeletalControlBase interface
 };

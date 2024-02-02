@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FMultiverseConnectorEditorModule : public IModuleInterface
+class FMultiverseConnectorEditorModule final : public IModuleInterface
 {
 public:
 	/** IModuleInterface implementation */

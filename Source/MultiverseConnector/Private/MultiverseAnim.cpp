@@ -1,4 +1,4 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2022, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 #include "MultiverseAnim.h"
 
@@ -10,7 +10,7 @@ void UMultiverseAnim::NativeBeginPlay()
 {
 	TArray<FName> BoneNames;
 	GetSkelMeshComponent()->GetBoneNames(BoneNames);
-	for (const FName &BoneName : BoneNames)
+	for (const FName& BoneName : BoneNames)
 	{
 		if (BoneName.ToString().EndsWith(TEXT("continuous_bone"), ESearchCase::CaseSensitive) ||
 			BoneName.ToString().EndsWith(TEXT("prismatic_bone"), ESearchCase::CaseSensitive) ||

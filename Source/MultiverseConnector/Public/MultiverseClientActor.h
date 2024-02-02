@@ -1,4 +1,4 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2022, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 #pragma once
 
@@ -23,17 +23,16 @@ protected:
 	virtual void BeginPlay() override;
 
 	/** Overridable function called whenever this actor is being removed from a level */
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason);
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 private:
-	void Init();
+	void Init() const;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Multiverse Client")
-	UMultiverseClientComponent *MultiverseClientComponent;
+	UMultiverseClientComponent* MultiverseClientComponent;
 };
-

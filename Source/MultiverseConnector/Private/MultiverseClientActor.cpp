@@ -1,8 +1,7 @@
-// Copyright (c) 2023, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2023, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 #include "MultiverseClientActor.h"
 
-#include "Animation/SkeletalMeshActor.h"
 #include "MultiverseClientComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientActor, Log, All);
@@ -39,7 +38,7 @@ void AMultiverseClientActor::Tick(float DeltaTime)
 	MultiverseClientComponent->Tick();
 }
 
-void AMultiverseClientActor::Init()
+void AMultiverseClientActor::Init() const
 {
 	MultiverseClientComponent->Init();
 }

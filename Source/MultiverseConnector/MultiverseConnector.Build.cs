@@ -1,4 +1,4 @@
-// Copyright (c) 2022, Hoang Giang Nguyen - Institute for Artificial Intelligence, University Bremen
+// Copyright (c) 2022, Giang Hoang Nguyen - Institute for Artificial Intelligence, University Bremen
 
 using System.IO;
 using UnrealBuildTool;
@@ -7,7 +7,7 @@ public class MultiverseConnector : ModuleRules
 {
   public MultiverseConnector(ReadOnlyTargetRules Target) : base(Target)
   {
-    PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+    PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
     PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "Public"));
     PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "Private"));
