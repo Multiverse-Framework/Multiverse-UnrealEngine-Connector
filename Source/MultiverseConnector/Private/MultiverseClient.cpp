@@ -477,13 +477,17 @@ void FMultiverseClient::wait_for_meta_data_thread_finish()
 void FMultiverseClient::bind_request_meta_data()
 {
 	RequestMetaDataJson = MakeShareable(new FJsonObject);
-	RequestMetaDataJson->SetStringField(TEXT("world_name"), WorldName);
-	RequestMetaDataJson->SetStringField(TEXT("simulation_name"), SimulationName);
-	RequestMetaDataJson->SetStringField(TEXT("time_unit"), TEXT("s"));
-	RequestMetaDataJson->SetStringField(TEXT("length_unit"), TEXT("cm"));
-	RequestMetaDataJson->SetStringField(TEXT("angle_unit"), TEXT("deg"));
-	RequestMetaDataJson->SetStringField(TEXT("handedness"), TEXT("lhs"));
-	RequestMetaDataJson->SetStringField(TEXT("force_unit"), TEXT("N"));
+
+	TSharedPtr<FJsonObject> MetaDataJson = MakeShareable(new FJsonObject);
+	MetaDataJson->SetStringField(TEXT("world_name"), WorldName);
+	MetaDataJson->SetStringField(TEXT("simulation_name"), SimulationName);
+	MetaDataJson->SetStringField(TEXT("time_unit"), TEXT("s"));
+	MetaDataJson->SetStringField(TEXT("length_unit"), TEXT("cm"));
+	MetaDataJson->SetStringField(TEXT("angle_unit"), TEXT("deg"));
+	MetaDataJson->SetStringField(TEXT("handedness"), TEXT("lhs"));
+	MetaDataJson->SetStringField(TEXT("force_unit"), TEXT("N"));
+
+	RequestMetaDataJson->SetObjectField(TEXT("meta_data"), MetaDataJson);
 
 	RequestMetaDataJson->SetObjectField(TEXT("send"), MakeShareable(new FJsonObject));
 	RequestMetaDataJson->SetObjectField(TEXT("receive"), MakeShareable(new FJsonObject));
