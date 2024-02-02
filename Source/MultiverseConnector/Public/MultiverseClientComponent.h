@@ -28,13 +28,16 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ServerHost;
+	FString ServerHost = TEXT("tcp://127.0.0.1");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ServerPort;
+	FString ServerPort = TEXT("7000");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ClientPort;
+	FString ClientHost = TEXT("tcp://127.0.0.1");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString ClientPort = TEXT("9000");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString WorldName = TEXT("world");

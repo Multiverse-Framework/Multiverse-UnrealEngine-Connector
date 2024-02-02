@@ -6,14 +6,12 @@
 
 UMultiverseClientComponent::UMultiverseClientComponent()
 {
-    ServerHost = TEXT("tcp://127.0.0.1");
-    ServerPort = TEXT("7000");
-    ClientPort = TEXT("7600");
+
 }
 
 void UMultiverseClientComponent::Init()
 {   
-    MultiverseClient.Init(ServerHost, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
+    MultiverseClient.Init(ServerHost, ServerPort, ClientHost, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
 }
 
 void UMultiverseClientComponent::Tick()

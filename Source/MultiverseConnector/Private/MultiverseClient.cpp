@@ -207,7 +207,7 @@ FMultiverseClient::FMultiverseClient()
 		{FLinearColor(0.1, 0.1, 0.1, 1), TEXT("Gray")}};
 }
 
-void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
+void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientHost, const FString &ClientPort,
 							 const FString &InWorldName, const FString &InSimulationName,
 							 TMap<AActor *, FAttributeContainer> &InSendObjects,
 							 TMap<AActor *, FAttributeContainer> &InReceiveObjects,
@@ -219,10 +219,13 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 	WorldName = InWorldName;
 	SimulationName = InSimulationName;
 
-	host = TCHAR_TO_UTF8(*ServerHost);
-	server_socket_addr = host + ":" + TCHAR_TO_UTF8(*ServerPort);
+	const FString ServerSocketAddr = ServerHost + TEXT(":") + ServerPort;
+	server_socket_addr = TCHAR_TO_UTF8(*ServerSocketAddr);
 
+	host = TCHAR_TO_UTF8(*ClientHost);
 	port = TCHAR_TO_UTF8(*ClientPort);
+
+	printf("ServerSocketAddr: %s\n", server_socket_addr.c_str());
 
 	connect();
 }
