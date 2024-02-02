@@ -2,8 +2,6 @@
 
 #include "MultiverseConnector.h"
 
-#include "Core.h"
-#include "Interfaces/IPluginManager.h"
 #include "Modules/ModuleManager.h"
 
 #define LOCTEXT_NAMESPACE "FMultiverseConnectorModule"

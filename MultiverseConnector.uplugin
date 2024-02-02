@@ -5,7 +5,7 @@
   "FriendlyName": "MultiverseConnector",
   "Description": "",
   "Category": "",
-  "CreatedBy": "Hoang Giang Nguyen",
+  "CreatedBy": "Giang Hoang Nguyen",
   "CreatedByURL": "https://github.com/HoangGiang93",
   "DocsURL": "https://github.com/Multiverse-Framework/Multiverse-UnrealEngine-Connector.git",
   "MarketplaceURL": "",
@@ -14,15 +14,15 @@
   "IsBetaVersion": false,
   "Installed": false,
   "Modules": [
-	{
-	  "Name": "MultiverseConnector",
-	  "Type": "Runtime",
-	  "LoadingPhase": "Default"
-	},
-  {
-	  "Name": "MultiverseConnectorEditor",
-	  "Type": "UncookedOnly",
-	  "LoadingPhase": "Default"
-	}
+    {
+      "Name": "MultiverseConnector",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "MultiverseConnectorEditor",
+      "Type": "UncookedOnly",
+      "LoadingPhase": "Default"
+    }
   ]
 }
