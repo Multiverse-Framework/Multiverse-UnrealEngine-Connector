@@ -8,6 +8,8 @@ public class MultiverseClientLibrary : ModuleRules
 	public MultiverseClientLibrary(ReadOnlyTargetRules Target) : base(Target)
 	{
 		Type = ModuleType.External;
+		
+		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		// Add any include paths for the plugin
 		PublicIncludePaths.Add(Path.Combine(ModuleDirectory));
@@ -25,7 +27,10 @@ public class MultiverseClientLibrary : ModuleRules
 			string MultiverseClientLibPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty",
 				"MultiverseClientLibrary", "multiverse_client.lib");
 			PublicAdditionalLibraries.Add(MultiverseClientLibPath);
-			RuntimeDependencies.Add(MultiverseClientLibPath);
+			
+			string ZmqLibPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty",
+				"MultiverseClientLibrary", "libzmq-mt-4_3_5.lib");
+			PublicAdditionalLibraries.Add(ZmqLibPath);
 		}
 	}
 }

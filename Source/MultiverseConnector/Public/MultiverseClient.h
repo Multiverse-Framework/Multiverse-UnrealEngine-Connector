@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 THIRD_PARTY_INCLUDES_START
-#include "MultiverseClientLibrary/multiverse_client.h"
+#include "ThirdParty/MultiverseClientLibrary/multiverse_client.h"
 THIRD_PARTY_INCLUDES_END
 #include "MultiverseClient.generated.h"
 
