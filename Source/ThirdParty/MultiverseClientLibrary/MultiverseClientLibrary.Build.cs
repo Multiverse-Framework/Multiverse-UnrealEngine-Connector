@@ -32,5 +32,11 @@ public class MultiverseClientLibrary : ModuleRules
 				"MultiverseClientLibrary", "Win64", "libzmq-mt-4_3_5.lib");
 			PublicAdditionalLibraries.Add(ZmqLibPath);
 		}
+		else if (Target.Platform == UnrealTargetPlatform.Android)
+		{
+			string MultiverseClientLibPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty", 
+				"MultiverseClientLibrary", "Android", "libmultiverse_client.so");
+			PublicAdditionalLibraries.Add(MultiverseClientLibPath);
+		}
 	}
 }
