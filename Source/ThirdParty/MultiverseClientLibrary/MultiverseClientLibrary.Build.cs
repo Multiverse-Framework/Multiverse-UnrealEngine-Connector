@@ -17,7 +17,7 @@ public class MultiverseClientLibrary : ModuleRules
 		if (Target.Platform == UnrealTargetPlatform.Linux)
 		{
 			string MultiverseClientSoPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty", 
-				"MultiverseClientLibrary", "libmultiverse_client.so");
+				"MultiverseClientLibrary", "Linux", "libmultiverse_client.so");
 			PublicAdditionalLibraries.Add(MultiverseClientSoPath);
 			PublicDelayLoadDLLs.Add(MultiverseClientSoPath);
 			RuntimeDependencies.Add(MultiverseClientSoPath);
@@ -25,11 +25,11 @@ public class MultiverseClientLibrary : ModuleRules
 		else if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			string MultiverseClientLibPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty",
-				"MultiverseClientLibrary", "multiverse_client.lib");
+				"MultiverseClientLibrary", "Win64", "multiverse_client.lib");
 			PublicAdditionalLibraries.Add(MultiverseClientLibPath);
 			
 			string ZmqLibPath = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty",
-				"MultiverseClientLibrary", "libzmq-mt-4_3_5.lib");
+				"MultiverseClientLibrary", "Win64", "libzmq-mt-4_3_5.lib");
 			PublicAdditionalLibraries.Add(ZmqLibPath);
 		}
 	}
