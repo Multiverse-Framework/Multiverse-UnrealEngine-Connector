@@ -38,11 +38,6 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 {
 	if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
 	{
-		if (UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent())
-		{
-			StaticMeshComponent->SetSimulatePhysics(false);
-		}
-
 		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
@@ -207,7 +202,7 @@ FMultiverseClient::FMultiverseClient()
 		{FLinearColor(0.1, 0.1, 0.1, 1), TEXT("Gray")}};
 }
 
-void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientHost, const FString &ClientPort,
+void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
 							 const FString &InWorldName, const FString &InSimulationName,
 							 TMap<AActor *, FAttributeContainer> &InSendObjects,
 							 TMap<AActor *, FAttributeContainer> &InReceiveObjects,
@@ -222,7 +217,7 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 	const FString ServerSocketAddr = ServerHost + TEXT(":") + ServerPort;
 	server_socket_addr = TCHAR_TO_UTF8(*ServerSocketAddr);
 
-	host = TCHAR_TO_UTF8(*ClientHost);
+	host = TCHAR_TO_UTF8(*ServerHost);
 	port = TCHAR_TO_UTF8(*ClientPort);
 
 	printf("ServerSocketAddr: %s\n", server_socket_addr.c_str());

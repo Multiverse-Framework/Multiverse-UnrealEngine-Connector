@@ -34,9 +34,6 @@ public:
 	FString ServerPort = TEXT("7000");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString ClientHost = TEXT("tcp://127.0.0.1");
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString ClientPort = TEXT("9000");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

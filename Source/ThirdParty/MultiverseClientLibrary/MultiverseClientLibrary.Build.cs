@@ -2,6 +2,7 @@
 
 using System.IO;
 using UnrealBuildTool;
+// ReSharper disable All
 
 public class MultiverseClientLibrary : ModuleRules
 {
