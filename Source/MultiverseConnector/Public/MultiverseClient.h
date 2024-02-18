@@ -68,8 +68,6 @@ private:
 
 	FString SimulationName;
 
-	TMap<AActor *, FAttributeContainer> ReceiveObjectRefs;
-
 	TMap<FString, AActor *> CachedActors;
 
 	TMap<FString, TPair<class UMultiverseAnim *, FName>> CachedBoneNames;

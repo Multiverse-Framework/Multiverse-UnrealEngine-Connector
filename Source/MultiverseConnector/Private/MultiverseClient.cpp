@@ -36,34 +36,9 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 TMap<FString, AActor *> &CachedActors,
 						 TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
 {
-	if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
+	if (Object.Key->IsA(ASkeletalMeshActor::StaticClass()))
 	{
-		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-		for (const EAttribute &Attribute : Object.Value.Attributes)
-		{
-			switch (Attribute)
-			{
-			case EAttribute::Position:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
-				break;
-
-			case EAttribute::Quaternion:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
-				break;
-
-			default:
-				break;
-			}
-		}
-
-		FString ObjectName = Object.Value.ObjectName;
-		CachedActors.Add(ObjectName, Object.Key);
-		ObjectName.RemoveFromEnd(TEXT("_ref"));
-		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
-	}
-	else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
-	{
-
+		ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key);
 		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
@@ -124,20 +99,36 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *Object.Value.ObjectName)
 		}
 	}
+	else if (Object.Key != nullptr)
+	{
+		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+		for (const EAttribute &Attribute : Object.Value.Attributes)
+		{
+			switch (Attribute)
+			{
+			case EAttribute::Position:
+				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+				break;
+
+			case EAttribute::Quaternion:
+				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+				break;
+
+			default:
+				break;
+			}
+		}
+
+		FString ObjectName = Object.Value.ObjectName;
+		CachedActors.Add(ObjectName, Object.Key);
+		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
+	}
 }
 
 static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 						  const TPair<AActor *, FAttributeContainer> &Object)
 {
-	if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(Object.Key))
-	{
-		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-		for (const EAttribute &Attribute : Object.Value.Attributes)
-		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
-		}
-	}
-	else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
+	if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
 	{
 		if (Object.Value.Attributes.Contains(EAttribute::Position))
 		{
@@ -185,6 +176,14 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
 					   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
+	}
+	else if (Object.Key != nullptr)
+	{
+		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+		for (const EAttribute &Attribute : Object.Value.Attributes)
+		{
+			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
+		}
 	}
 }
 
@@ -343,100 +342,7 @@ bool FMultiverseClient::init_objects(bool from_server)
 		return false;
 	}
 
-	for (const TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
-	{
-		if (ReceiveObject.Key == nullptr)
-		{
-			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjects."))
-			continue;
-		}
-
-		if (AStaticMeshActor *StaticMeshActor = Cast<AStaticMeshActor>(ReceiveObject.Key))
-		{
-			UStaticMeshComponent *StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
-			if (StaticMeshComponent == nullptr || StaticMeshComponent->GetStaticMesh() == nullptr)
-			{
-				UE_LOG(LogMultiverseClient, Warning, TEXT("StaticMeshActor %s in ReceiveObjects has None StaticMeshComponent."), *ReceiveObject.Value.ObjectName)
-				continue;
-			}
-			if (!StaticMeshComponent->IsSimulatingPhysics())
-			{
-				UE_LOG(LogMultiverseClient, Warning, TEXT("StaticMeshActor %s has disabled physics, enabling physics."), *ReceiveObject.Value.ObjectName)
-				StaticMeshComponent->SetSimulatePhysics(true);
-			}
-
-			StaticMeshComponent->SetVisibility(false);
-			// UMaterial *RedMaterial = GetMaterial(FLinearColor(1, 0, 0, 1));
-			// for (int32 i = 0; i < StaticMeshComponent->GetMaterials().Num(); i++)
-			// {
-			// 	StaticMeshComponent->SetMaterial(i, RedMaterial);
-			// }
-
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Template = StaticMeshActor;
-			SpawnParams.Name = *(ReceiveObject.Value.ObjectName + TEXT("_ref"));
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			AActor *ReceiveObjectRef = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(), SpawnParams);
-			if (ReceiveObjectRef == nullptr)
-			{
-				UE_LOG(LogMultiverseClient, Error, TEXT("Failed to spawn StaticMeshActor %s"), *SpawnParams.Name.ToString())
-				continue;
-			}
-
-#if WITH_EDITOR
-			ReceiveObjectRef->SetActorLabel(SpawnParams.Name.ToString());
-#endif
-
-			AStaticMeshActor *StaticMeshActorRef = Cast<AStaticMeshActor>(ReceiveObjectRef);
-
-			UStaticMeshComponent *StaticMeshComponentRef = StaticMeshActorRef->GetStaticMeshComponent();
-			StaticMeshComponentRef->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-			StaticMeshComponentRef->SetSimulatePhysics(false);
-
-			StaticMeshComponentRef->SetVisibility(true);
-			// UMaterial *GrayMaterial = GetMaterial(FLinearColor(0.1, 0.1, 0.1, 1));
-			// for (int32 i = 0; i < StaticMeshComponentRef->GetMaterials().Num(); i++)
-			// {
-			// 	StaticMeshComponentRef->SetMaterial(i, GrayMaterial);
-			// }
-
-			UPhysicsConstraintComponent *PhysicsConstraint = NewObject<UPhysicsConstraintComponent>(StaticMeshActorRef);
-			PhysicsConstraint->AttachToComponent(StaticMeshComponentRef, FAttachmentTransformRules::KeepWorldTransform);
-			PhysicsConstraint->SetWorldLocation(StaticMeshActorRef->GetActorLocation());
-
-			PhysicsConstraint->ComponentName1.ComponentName = *StaticMeshActorRef->GetName();
-			PhysicsConstraint->ComponentName2.ComponentName = *StaticMeshActor->GetName();
-			PhysicsConstraint->ConstraintActor1 = StaticMeshActorRef;
-			PhysicsConstraint->ConstraintActor2 = StaticMeshActor;
-			PhysicsConstraint->ConstraintInstance.Pos1 = FVector();
-			PhysicsConstraint->ConstraintInstance.Pos2 = FVector();
-
-			PhysicsConstraint->SetConstrainedComponents(StaticMeshComponentRef, NAME_None, StaticMeshComponent, NAME_None);
-
-			// Enable linear constraint in all axes
-			PhysicsConstraint->SetLinearXLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
-			PhysicsConstraint->SetLinearYLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
-			PhysicsConstraint->SetLinearZLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
-			// PhysicsConstraint->ConstraintInstance.ProfileInstance.LinearLimit.bSoftConstraint = true;
-
-			// Enable angular constraint in all axes
-			PhysicsConstraint->SetAngularSwing1Limit(EAngularConstraintMotion::ACM_Locked, 0.f);
-			PhysicsConstraint->SetAngularSwing2Limit(EAngularConstraintMotion::ACM_Locked, 0.f);
-			PhysicsConstraint->SetAngularTwistLimit(EAngularConstraintMotion::ACM_Locked, 0.f);
-			// PhysicsConstraint->ConstraintInstance.ProfileInstance.ConeLimit.bSoftConstraint = true;
-			// PhysicsConstraint->ConstraintInstance.ProfileInstance.TwistLimit.bSoftConstraint = true;
-
-			PhysicsConstraint->RegisterComponent();
-
-			ReceiveObjectRefs.Add(ReceiveObjectRef, ReceiveObject.Value);
-		}
-		else if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(ReceiveObject.Key))
-		{
-			ReceiveObjectRefs.Add(ReceiveObject.Key, ReceiveObject.Value);
-		}
-	}
-
-	return SendObjects.Num() > 0 || ReceiveObjectRefs.Num() > 0;
+	return SendObjects.Num() > 0 || ReceiveObjects.Num() > 0;
 }
 
 void FMultiverseClient::start_connect_to_server_thread()
@@ -498,15 +404,15 @@ void FMultiverseClient::bind_request_meta_data()
 		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("send")), SendObject, CachedActors, CachedBoneNames);
 	}
 
-	for (const TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
+	for (const TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
 	{
-		if (ReceiveObjectRef.Key == nullptr)
+		if (ReceiveObject.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjects"))
 			continue;
 		}
 
-		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObjectRef, CachedActors, CachedBoneNames);
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObject, CachedActors, CachedBoneNames);
 	}
 
 	FString RequestMetaDataString;
@@ -648,15 +554,15 @@ void FMultiverseClient::init_send_and_receive_data()
 		BindDataArray(SendDataArray, SendObject);
 	}
 
-	for (TPair<AActor *, FAttributeContainer> &ReceiveObjectRef : ReceiveObjectRefs)
+	for (TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
 	{
-		if (ReceiveObjectRef.Key == nullptr)
+		if (ReceiveObject.Key == nullptr)
 		{
-			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjectRefs"))
+			UE_LOG(LogMultiverseClient, Warning, TEXT("Ignore None Object in ReceiveObjects"))
 			continue;
 		}
 
-		BindDataArray(ReceiveDataArray, ReceiveObjectRef);
+		BindDataArray(ReceiveDataArray, ReceiveObject);
 	}
 }
 
