@@ -26,15 +26,14 @@ void FAnimNode_ModifyBones::EvaluateSkeletalControl_AnyThread(FComponentSpacePos
 		FCompactPoseBoneIndex CompactPoseBoneToModifyIndex = BoneToModify.GetCompactPoseIndex(BoneContainer);
 
 		// Convert back to Component Space.
+		FTransform BoneTransform = JointPoses[BoneToModify.BoneName];
 		FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose,
-		                                                 JointPoses[BoneToModify.BoneName],
+		                                                 BoneTransform,
 		                                                 CompactPoseBoneToModifyIndex,
 		                                                 BCS_BoneSpace);
 
 		OutBoneTransforms.Add(FBoneTransform(BoneToModify.GetCompactPoseIndex(BoneContainer),
-		                                     JointPoses[BoneToModify.BoneName]));
-
-		TRACE_ANIM_NODE_VALUE(Output, TEXT("Target"), BoneToModify.BoneName);
+		                                     BoneTransform));
 
 		Output.Pose.LocalBlendCSBoneTransforms(OutBoneTransforms, 1.f);
 	}

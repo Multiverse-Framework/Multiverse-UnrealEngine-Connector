@@ -529,7 +529,6 @@ void FMultiverseClient::bind_response_meta_data()
 				{
 					continue;
 				}
-
 				CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue[0]->AsNumber(), 0.f));
 				break;
 			}
