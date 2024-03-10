@@ -3,6 +3,10 @@
 #include "MultiverseClientComponent.h"
 
 #include "MultiverseClient.h"
+#include "HAL/PlatformFilemanager.h"
+#include "Misc/FileHelper.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientComponent, Log, All);
 
 UMultiverseClientComponent::UMultiverseClientComponent()
 {
@@ -11,6 +15,57 @@ UMultiverseClientComponent::UMultiverseClientComponent()
 
 void UMultiverseClientComponent::Init()
 {   
+    if (!ServerHost.StartsWith("tcp://"))
+    {
+        ServerHost = FPaths::ProjectDir() / ServerHost;
+        UE_LOG(LogMultiverseClientComponent, Log, TEXT("Read ServerHost from: %s"), *ServerHost)
+        if (!FPlatformFileManager::Get().GetPlatformFile().FileExists(*ServerHost))
+        {
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("ServerHost.txt file not found: %s"), *ServerHost)
+            return;
+        }
+        if (!FFileHelper::LoadFileToString(ServerHost, *ServerHost))
+        {
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to load ServerHost.txt file: %s"), *ServerHost)
+            return;
+        }
+    }
+    UE_LOG(LogMultiverseClientComponent, Log, TEXT("ServerHost: %s"), *ServerHost)
+
+    if (!ServerPort.IsNumeric())
+    {
+        ServerPort = FPaths::ProjectDir() / ServerPort;
+        UE_LOG(LogMultiverseClientComponent, Log, TEXT("Read ServerPort from: %s"), *ServerPort)
+        if (!FPlatformFileManager::Get().GetPlatformFile().FileExists(*ServerPort))
+        {
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("ServerPort.txt file not found: %s"), *ServerPort)
+            return;
+        }
+        if (!FFileHelper::LoadFileToString(ServerPort, *ServerPort))
+        {
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to load ServerPort.txt file: %s"), *ServerPort)
+            return;
+        }
+    }
+    UE_LOG(LogMultiverseClientComponent, Log, TEXT("ServerPort: %s"), *ServerPort)
+
+    if (!ClientPort.IsNumeric())
+    {
+        ClientPort = FPaths::ProjectDir() / ClientPort;
+        UE_LOG(LogMultiverseClientComponent, Log, TEXT("Read ClientPort from: %s"), *ClientPort)
+        if (!FPlatformFileManager::Get().GetPlatformFile().FileExists(*ClientPort))
+        {
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("ClientPort.txt file not found: %s"), *ClientPort)
+            return;
+        }
+        if (!FFileHelper::LoadFileToString(ClientPort, *ClientPort))
+        {
+            UE_LOG(LogMultiverseClientComponent, Error, TEXT("Failed to load ClientPort.txt file: %s"), *ClientPort)
+            return;
+        }
+    }
+    UE_LOG(LogMultiverseClientComponent, Log, TEXT("ClientPort: %s"), *ClientPort)
+    
     MultiverseClient.Init(ServerHost, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
 }
 
