@@ -74,13 +74,9 @@ private:
 
 	TMap<FLinearColor, FString> ColorMap;
 
+	float StartTime;
+
 private:
-	bool compute_response_meta_data() override;
-
-	void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
-
-	void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;
-
 	void start_connect_to_server_thread() override;
 
 	void wait_for_connect_to_server_thread_finish() override;
@@ -89,9 +85,15 @@ private:
 
 	void wait_for_meta_data_thread_finish() override;
 
-	bool init_objects(bool from_server = false) override;
+	bool init_objects(bool from_request_meta_data = false) override;
 
 	void bind_request_meta_data() override;
+
+	bool compute_request_and_response_meta_data() override;
+
+	void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
+
+	void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;	
 
 	void bind_response_meta_data() override;
 

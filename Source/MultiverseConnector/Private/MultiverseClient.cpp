@@ -222,6 +222,8 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 	printf("ServerSocketAddr: %s\n", server_socket_addr.c_str());
 
 	connect();
+
+	StartTime = FPlatformTime::Seconds();
 }
 
 UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const
@@ -230,7 +232,7 @@ UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const
 	return Cast<UMaterial>(StaticLoadObject(UMaterial::StaticClass(), nullptr, *(TEXT("Material'/MultiverseConnector/Assets/Materials/") + ColorName + TEXT(".") + ColorName + TEXT("'"))));
 }
 
-bool FMultiverseClient::compute_response_meta_data()
+bool FMultiverseClient::compute_request_and_response_meta_data()
 {
 	ResponseMetaDataJson = MakeShareable(new FJsonObject);
 	if (response_meta_data_str.empty())
@@ -243,7 +245,7 @@ bool FMultiverseClient::compute_response_meta_data()
 
 	return FJsonSerializer::Deserialize(Reader, ResponseMetaDataJson) &&
 		   ResponseMetaDataJson->HasField("time") &&
-		   ResponseMetaDataJson->GetNumberField("time") > 0;
+		   ResponseMetaDataJson->GetNumberField("time") >= 0;
 }
 
 void FMultiverseClient::compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const
@@ -309,7 +311,7 @@ void FMultiverseClient::compute_response_buffer_sizes(size_t &res_send_buffer_si
 	res_receive_buffer_size = ResponseBufferSizes[TEXT("receive")];
 }
 
-bool FMultiverseClient::init_objects(bool from_server)
+bool FMultiverseClient::init_objects(bool from_request_meta_data)
 {
 	SendObjects.Remove(nullptr);
 	ReceiveObjects.Remove(nullptr);
@@ -567,6 +569,7 @@ void FMultiverseClient::init_send_and_receive_data()
 
 void FMultiverseClient::bind_send_data()
 {
+	send_buffer[0] = FPlatformTime::Seconds() - StartTime;
 	double *send_buffer_addr = send_buffer + 1;
 
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
@@ -701,5 +704,5 @@ void FMultiverseClient::clean_up()
 
 void FMultiverseClient::reset()
 {
-	
+	StartTime = FPlatformTime::Seconds();
 }

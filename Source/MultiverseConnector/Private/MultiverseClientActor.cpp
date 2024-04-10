@@ -40,5 +40,25 @@ void AMultiverseClientActor::Tick(float DeltaTime)
 
 void AMultiverseClientActor::Init() const
 {
+	UWorld *World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogMultiverseClientActor, Error, TEXT("World not found"));
+		return;
+	}
+
+#if WITH_EDITOR
+	for (AActor *Actor : World->GetCurrentLevel()->Actors)
+	{
+		if (Actor && Actor->Tags.Contains((FName("receive_position"))))
+		{
+			FAttributeContainer AttributeContainer;
+			AttributeContainer.ObjectName = Actor->GetActorLabel();
+			AttributeContainer.Attributes.Add(EAttribute::Position);
+			MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
+		}
+	}
+#endif
+
 	MultiverseClientComponent->Init();
 }
