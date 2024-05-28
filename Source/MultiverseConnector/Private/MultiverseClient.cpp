@@ -770,14 +770,37 @@ void FMultiverseClient::bind_send_data()
 
 						if (SendData.Value == EAttribute::Position)
 						{
-							const FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
+							FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
+							if (BoneName == TEXT("Wrist Root"))
+							{
+								BoneLocation += FVector(-25.f, 0.f, 0.f);
+							}
 							*send_buffer_addr++ = BoneLocation.X;
 							*send_buffer_addr++ = BoneLocation.Y;
 							*send_buffer_addr++ = BoneLocation.Z;
 						}
 						else if (SendData.Value == EAttribute::Quaternion)
 						{
-							const FQuat BoneQuat = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace).Quaternion();
+							FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
+							if (Tag == TEXT("LeftHand"))
+							{
+								if (BoneName == TEXT("Wrist Root"))
+								{
+									BoneRotator = BoneRotator.Add(0.f, 0.f, -90.f);
+								}
+								else
+								{
+									BoneRotator = BoneRotator.Add(0.f, -90.f, 180.f);
+								}
+								
+							}
+							else if (Tag == TEXT("RightHand") && BoneName == TEXT("Wrist Root"))
+							{
+								BoneRotator = BoneRotator.Add(180.f, 0.f, -90.f);
+								BoneRotator.Roll = -BoneRotator.Roll;
+							}
+							
+							const FQuat BoneQuat = BoneRotator.Quaternion();
 							*send_buffer_addr++ = BoneQuat.W;
 							*send_buffer_addr++ = BoneQuat.X;
 							*send_buffer_addr++ = BoneQuat.Y;
