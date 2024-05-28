@@ -9,6 +9,8 @@
 #include "MultiverseAnim.h"
 #include "MultiverseClient.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "OculusXRHandComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include <chrono>
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
@@ -99,6 +101,65 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *Object.Value.ObjectName)
 		}
 	}
+	else if (Object.Key->IsA(APawn::StaticClass()))
+	{
+		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
+		{
+			for (UActorComponent* ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("ActorComponent: %s"), *ActorComponent->GetName())
+				TArray<FString> BoneNames = {
+					TEXT("WristRoot"), 
+					TEXT("ForearmStub"),
+					TEXT("Thumb0"),
+					TEXT("Thumb1"),
+					TEXT("Thumb2"),
+					TEXT("Thumb3"),
+					TEXT("ThumbTip"),
+					TEXT("Index1"),
+					TEXT("Index2"),
+					TEXT("Index3"),
+					TEXT("IndexTip"),
+					TEXT("Middle1"),
+					TEXT("Middle2"),
+					TEXT("Middle3"),
+					TEXT("MiddleTip"),
+					TEXT("Ring1"),
+					TEXT("Ring2"),
+					TEXT("Ring3"),
+					TEXT("RingTip"),
+					TEXT("Pinky0"),
+					TEXT("Pinky1"),
+					TEXT("Pinky2"),
+					TEXT("Pinky3"),
+					TEXT("PinkyTip")
+				};
+				for (const FString &BoneName : BoneNames)
+				{
+					UE_LOG(LogMultiverseClient, Warning, TEXT("BoneName: %s"), *BoneName)
+					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
+					TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+					for (const EAttribute &Attribute : Object.Value.Attributes)
+					{
+						switch (Attribute)
+						{
+						case EAttribute::Position:
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+							break;
+
+						case EAttribute::Quaternion:
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+							break;
+
+						default:
+							break;
+						}
+					}
+					MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
+				}
+			}
+		}
+	}
 	else if (Object.Key != nullptr)
 	{
 		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
@@ -172,6 +233,57 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		else
 		{
 			UE_LOG(LogMultiverseClient, Warning, TEXT("SkeletalMeshActor %s does not contain a UStaticMeshComponent."), *Object.Value.ObjectName)
+		}
+
+		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
+					   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
+	}
+	else if (Object.Key->IsA(APawn::StaticClass()))
+	{
+		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
+		{
+			for (UActorComponent* ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+			{
+				TArray<FString> BoneNames = {
+					TEXT("WristRoot"), 
+					TEXT("ForearmStub"),
+					TEXT("Thumb0"),
+					TEXT("Thumb1"),
+					TEXT("Thumb2"),
+					TEXT("Thumb3"),
+					TEXT("ThumbTip"),
+					TEXT("Index1"),
+					TEXT("Index2"),
+					TEXT("Index3"),
+					TEXT("IndexTip"),
+					TEXT("Middle1"),
+					TEXT("Middle2"),
+					TEXT("Middle3"),
+					TEXT("MiddleTip"),
+					TEXT("Ring1"),
+					TEXT("Ring2"),
+					TEXT("Ring3"),
+					TEXT("RingTip"),
+					TEXT("Pinky0"),
+					TEXT("Pinky1"),
+					TEXT("Pinky2"),
+					TEXT("Pinky3"),
+					TEXT("PinkyTip")
+				};
+				for (const FString &BoneName : BoneNames)
+				{
+					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
+					if (Object.Value.Attributes.Contains(EAttribute::Position))
+					{
+						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Position));
+					}
+
+					if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
+					{
+						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Quaternion));
+					}
+				}
+			}
 		}
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
@@ -542,6 +654,16 @@ void FMultiverseClient::bind_response_meta_data()
 	}
 }
 
+void FMultiverseClient::bind_api_callbacks()
+{
+
+}
+
+void FMultiverseClient::bind_api_callbacks_response()
+{
+
+}
+
 void FMultiverseClient::init_send_and_receive_data()
 {
 	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
@@ -627,6 +749,42 @@ void FMultiverseClient::bind_send_data()
 
 			default:
 				break;
+			}
+		}
+		else
+		{
+			APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+			for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
+			{
+				if (SendData.Key.Contains(Tag))
+				{
+					const FString BoneName = SendData.Key.RightChop(Tag.Len() + 1).Replace(TEXT("WristRoot"), TEXT("Wrist Root")).Replace(TEXT("ForearmStub"), TEXT("Forearm Stub")).Replace(TEXT("Tip"), TEXT(" Tip"));
+					for (UActorComponent *HandComponent : PlayerPawn->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+					{
+						UOculusXRHandComponent *OculusXRHandComponent = Cast<UOculusXRHandComponent>(HandComponent);
+						if (OculusXRHandComponent == nullptr)
+						{
+							UE_LOG(LogMultiverseClient, Error, TEXT("%s is not OculusXRHandComponent"), *Tag)
+							continue;
+						}
+
+						if (SendData.Value == EAttribute::Position)
+						{
+							const FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
+							*send_buffer_addr++ = BoneLocation.X;
+							*send_buffer_addr++ = BoneLocation.Y;
+							*send_buffer_addr++ = BoneLocation.Z;
+						}
+						else if (SendData.Value == EAttribute::Quaternion)
+						{
+							const FQuat BoneQuat = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace).Quaternion();
+							*send_buffer_addr++ = BoneQuat.W;
+							*send_buffer_addr++ = BoneQuat.X;
+							*send_buffer_addr++ = BoneQuat.Y;
+							*send_buffer_addr++ = BoneQuat.Z;
+						}
+					}
+				}
 			}
 		}
 	}

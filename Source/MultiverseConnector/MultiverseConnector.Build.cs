@@ -29,6 +29,7 @@ public class MultiverseConnector : ModuleRules
     PrivateDependencyModuleNames.AddRange(
       new string[] 
       {
+        "OculusXRInput"
       });
 
     // Uncomment if you are using Slate UI

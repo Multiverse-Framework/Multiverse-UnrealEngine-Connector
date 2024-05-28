@@ -3,6 +3,7 @@
 #include "MultiverseClientActor.h"
 
 #include "MultiverseClientComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientActor, Log, All);
 
@@ -59,6 +60,13 @@ void AMultiverseClientActor::Init() const
 		}
 	}
 #endif
+
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+	FAttributeContainer AttributeContainer;
+	AttributeContainer.ObjectName = TEXT("PlayerPawn");
+	AttributeContainer.Attributes.Add(EAttribute::Position);
+	AttributeContainer.Attributes.Add(EAttribute::Quaternion);
+	MultiverseClientComponent->SendObjects.Add(PlayerPawn, AttributeContainer);
 
 	MultiverseClientComponent->Init();
 }

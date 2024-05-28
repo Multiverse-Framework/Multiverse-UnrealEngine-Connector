@@ -93,7 +93,11 @@ private:
 
 	void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
 
-	void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;	
+	void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;
+
+	void bind_api_callbacks() override;
+
+	void bind_api_callbacks_response() override;
 
 	void bind_response_meta_data() override;
 
