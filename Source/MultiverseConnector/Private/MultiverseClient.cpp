@@ -33,6 +33,33 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("joint_position"), EAttribute::JointPosition},
 		{TEXT("joint_quaternion"), EAttribute::JointQuaternion}};
 
+const TArray<FString> HandBoneNames = 
+	{
+		TEXT("WristRoot"), 
+		TEXT("ForearmStub"),
+		TEXT("Thumb0"),
+		TEXT("Thumb1"),
+		TEXT("Thumb2"),
+		TEXT("Thumb3"),
+		TEXT("ThumbTip"),
+		TEXT("Index1"),
+		TEXT("Index2"),
+		TEXT("Index3"),
+		TEXT("IndexTip"),
+		TEXT("Middle1"),
+		TEXT("Middle2"),
+		TEXT("Middle3"),
+		TEXT("MiddleTip"),
+		TEXT("Ring1"),
+		TEXT("Ring2"),
+		TEXT("Ring3"),
+		TEXT("RingTip"),
+		TEXT("Pinky0"),
+		TEXT("Pinky1"),
+		TEXT("Pinky2"),
+		TEXT("Pinky3"),
+		TEXT("PinkyTip")};
+
 static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 const TPair<AActor *, FAttributeContainer> &Object,
 						 TMap<FString, AActor *> &CachedActors,
@@ -107,36 +134,8 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 		{
 			for (UActorComponent* ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
 			{
-				UE_LOG(LogMultiverseClient, Warning, TEXT("ActorComponent: %s"), *ActorComponent->GetName())
-				TArray<FString> BoneNames = {
-					TEXT("WristRoot"), 
-					TEXT("ForearmStub"),
-					TEXT("Thumb0"),
-					TEXT("Thumb1"),
-					TEXT("Thumb2"),
-					TEXT("Thumb3"),
-					TEXT("ThumbTip"),
-					TEXT("Index1"),
-					TEXT("Index2"),
-					TEXT("Index3"),
-					TEXT("IndexTip"),
-					TEXT("Middle1"),
-					TEXT("Middle2"),
-					TEXT("Middle3"),
-					TEXT("MiddleTip"),
-					TEXT("Ring1"),
-					TEXT("Ring2"),
-					TEXT("Ring3"),
-					TEXT("RingTip"),
-					TEXT("Pinky0"),
-					TEXT("Pinky1"),
-					TEXT("Pinky2"),
-					TEXT("Pinky3"),
-					TEXT("PinkyTip")
-				};
-				for (const FString &BoneName : BoneNames)
+				for (const FString &BoneName : HandBoneNames)
 				{
-					UE_LOG(LogMultiverseClient, Warning, TEXT("BoneName: %s"), *BoneName)
 					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
 					TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 					for (const EAttribute &Attribute : Object.Value.Attributes)
@@ -244,33 +243,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		{
 			for (UActorComponent* ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
 			{
-				TArray<FString> BoneNames = {
-					TEXT("WristRoot"), 
-					TEXT("ForearmStub"),
-					TEXT("Thumb0"),
-					TEXT("Thumb1"),
-					TEXT("Thumb2"),
-					TEXT("Thumb3"),
-					TEXT("ThumbTip"),
-					TEXT("Index1"),
-					TEXT("Index2"),
-					TEXT("Index3"),
-					TEXT("IndexTip"),
-					TEXT("Middle1"),
-					TEXT("Middle2"),
-					TEXT("Middle3"),
-					TEXT("MiddleTip"),
-					TEXT("Ring1"),
-					TEXT("Ring2"),
-					TEXT("Ring3"),
-					TEXT("RingTip"),
-					TEXT("Pinky0"),
-					TEXT("Pinky1"),
-					TEXT("Pinky2"),
-					TEXT("Pinky3"),
-					TEXT("PinkyTip")
-				};
-				for (const FString &BoneName : BoneNames)
+				for (const FString &BoneName : HandBoneNames)
 				{
 					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
 					if (Object.Value.Attributes.Contains(EAttribute::Position))
@@ -770,36 +743,14 @@ void FMultiverseClient::bind_send_data()
 
 						if (SendData.Value == EAttribute::Position)
 						{
-							FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
-							if (BoneName == TEXT("Wrist Root"))
-							{
-								BoneLocation += FVector(-25.f, 0.f, 0.f);
-							}
+							const FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
 							*send_buffer_addr++ = BoneLocation.X;
 							*send_buffer_addr++ = BoneLocation.Y;
 							*send_buffer_addr++ = BoneLocation.Z;
 						}
 						else if (SendData.Value == EAttribute::Quaternion)
 						{
-							FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
-							if (Tag == TEXT("LeftHand"))
-							{
-								if (BoneName == TEXT("Wrist Root"))
-								{
-									BoneRotator = BoneRotator.Add(0.f, 0.f, -90.f);
-								}
-								else
-								{
-									BoneRotator = BoneRotator.Add(0.f, -90.f, 180.f);
-								}
-								
-							}
-							else if (Tag == TEXT("RightHand") && BoneName == TEXT("Wrist Root"))
-							{
-								BoneRotator = BoneRotator.Add(180.f, 0.f, -90.f);
-								BoneRotator.Roll = -BoneRotator.Roll;
-							}
-							
+							const FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
 							const FQuat BoneQuat = BoneRotator.Quaternion();
 							*send_buffer_addr++ = BoneQuat.W;
 							*send_buffer_addr++ = BoneQuat.X;
