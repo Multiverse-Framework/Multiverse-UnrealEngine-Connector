@@ -32,6 +32,29 @@ public:
 	TArray<EAttribute> Attributes;
 };
 
+USTRUCT(Blueprintable)
+struct FApiCallback
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString Name;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FString> Arguments;
+};
+
+USTRUCT(Blueprintable)
+struct FApiCallbacks
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FApiCallback> ApiCallbacks;
+};
+
 class MULTIVERSECONNECTOR_API FMultiverseClient : public MultiverseClient
 {
 public:
@@ -43,6 +66,8 @@ public:
 			  TMap<AActor *, FAttributeContainer> &SendObjects,
 			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
 			  UWorld *World);
+
+	TMap<FString, FApiCallbacks> CallApis(const TMap<FString, FApiCallbacks> &SimulationApiCallbacks);
 
 private:
 	TMap<AActor *, FAttributeContainer> SendObjects;
@@ -75,6 +100,8 @@ private:
 	TMap<FLinearColor, FString> ColorMap;
 
 	float StartTime;
+
+	bool bComputingRequestAndResponseMetaData = false;
 
 private:
 	void start_connect_to_server_thread() override;

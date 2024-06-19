@@ -69,9 +69,20 @@ void UMultiverseClientComponent::Init()
     MultiverseClient.Init(ServerHost, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
 }
 
-void UMultiverseClientComponent::Tick()
+void UMultiverseClientComponent::Tick(float DeltaTime)
 {
+    CurrentCycleTime += DeltaTime;
+    if (SimulationApiCallbacks.Num() > 0 && bSimulationApiCallbacksEnabled && CurrentCycleTime >= 1.f / SimulationApiCallbacksRate)
+    {
+        SimulationApiCallbacksResponse = MultiverseClient.CallApis(SimulationApiCallbacks);
+    }
+    
     MultiverseClient.communicate();
+
+    if (CurrentCycleTime >= 1.f / SimulationApiCallbacksRate)
+    {
+        CurrentCycleTime = 0.f;
+    }
 }
 
 void UMultiverseClientComponent::Deinit()

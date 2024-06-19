@@ -11,6 +11,8 @@
 
 struct FAttributeContainer;
 
+struct FApiCallbacks;
+
 UCLASS(Blueprintable, DefaultToInstanced, collapsecategories, hidecategories = Object, editinlinenew)
 class MULTIVERSECONNECTOR_API UMultiverseClientComponent final : public UObject
 {
@@ -22,7 +24,7 @@ public:
 public:
 	void Init();
 
-	void Tick();
+	void Tick(float DeltaTime);
 
 	void Deinit();
 
@@ -48,6 +50,20 @@ public:
 	UPROPERTY(EditAnywhere)
 	TMap<AActor*, FAttributeContainer> ReceiveObjects;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "API Callbacks")
+	bool bSimulationApiCallbacksEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "API Callbacks")
+	float SimulationApiCallbacksRate = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "API Callbacks")
+	TMap<FString, FApiCallbacks> SimulationApiCallbacks;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "API Callbacks")
+	TMap<FString, FApiCallbacks> SimulationApiCallbacksResponse;
+
 private:
 	FMultiverseClient MultiverseClient;
+
+	float CurrentCycleTime = 0.f;
 };

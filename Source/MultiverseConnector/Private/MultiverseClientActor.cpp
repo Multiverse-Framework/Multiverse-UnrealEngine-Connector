@@ -36,7 +36,7 @@ void AMultiverseClientActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	MultiverseClientComponent->Tick();
+	MultiverseClientComponent->Tick(DeltaTime);
 }
 
 void AMultiverseClientActor::Init() const
@@ -56,6 +56,13 @@ void AMultiverseClientActor::Init() const
 			FAttributeContainer AttributeContainer;
 			AttributeContainer.ObjectName = Actor->GetActorLabel();
 			AttributeContainer.Attributes.Add(EAttribute::Position);
+			MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
+		}
+		if (Actor && Actor->Tags.Contains((FName("receive_quaternion"))))
+		{
+			FAttributeContainer AttributeContainer;
+			AttributeContainer.ObjectName = Actor->GetActorLabel();
+			AttributeContainer.Attributes.Add(EAttribute::Quaternion);
 			MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
 		}
 	}

@@ -33,9 +33,9 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("joint_position"), EAttribute::JointPosition},
 		{TEXT("joint_quaternion"), EAttribute::JointQuaternion}};
 
-const TArray<FString> HandBoneNames = 
+const TArray<FString> HandBoneNames =
 	{
-		TEXT("WristRoot"), 
+		TEXT("WristRoot"),
 		TEXT("ForearmStub"),
 		TEXT("Thumb0"),
 		TEXT("Thumb1"),
@@ -132,7 +132,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	{
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
-			for (UActorComponent* ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
 			{
 				for (const FString &BoneName : HandBoneNames)
 				{
@@ -241,7 +241,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 	{
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
-			for (UActorComponent* ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
 			{
 				for (const FString &BoneName : HandBoneNames)
 				{
@@ -311,6 +311,75 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 	StartTime = FPlatformTime::Seconds();
 }
 
+TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FApiCallbacks> &SimulationApiCallbacks)
+{
+	RequestMetaDataJson = MakeShareable(new FJsonObject);
+	const TSharedPtr<FJsonObject> SimulationApiCallbacksJson = MakeShareable(new FJsonObject);
+	for (const TPair<const FString, FApiCallbacks> &SimulationApiCallback : SimulationApiCallbacks)
+	{
+		TArray<TSharedPtr<FJsonValue>> SimulationApiCallbacksJsonValues;
+		for (const FApiCallback &ApiCallback : SimulationApiCallback.Value.ApiCallbacks)
+		{
+			TArray<TSharedPtr<FJsonValue>> ApiCallbackArgumentsJsonValues;
+			for (const FString &Argument : ApiCallback.Arguments)
+			{
+				ApiCallbackArgumentsJsonValues.Add(MakeShareable(new FJsonValueString(Argument)));
+			}
+			TSharedPtr<FJsonObject> SimulationApiCallbackJson = MakeShareable(new FJsonObject);
+			SimulationApiCallbackJson->SetArrayField(ApiCallback.Name, ApiCallbackArgumentsJsonValues);
+			SimulationApiCallbacksJsonValues.Add(MakeShareable(new FJsonValueObject(SimulationApiCallbackJson)));
+		}
+		SimulationApiCallbacksJson->SetArrayField(SimulationApiCallback.Key, SimulationApiCallbacksJsonValues);
+	}
+	RequestMetaDataJson->SetObjectField(TEXT("api_callbacks"), SimulationApiCallbacksJson);
+
+	if (ResponseMetaDataJson.IsValid())
+	{
+		ResponseMetaDataJson->RemoveField(TEXT("api_callbacks_response"));
+	}
+
+	bComputingRequestAndResponseMetaData = true;
+	communicate(true);
+	while (bComputingRequestAndResponseMetaData)
+	{
+		UE_LOG(LogMultiverseClient, Warning, TEXT("Waiting for api_callbacks_response..."))
+	}
+
+	while (!ResponseMetaDataJson.IsValid() || ResponseMetaDataJson->Values.IsEmpty() || !ResponseMetaDataJson->HasField(TEXT("api_callbacks_response")))
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Waiting for api_callbacks_response..."))
+	}
+
+	TMap<FString, FApiCallbacks> ApiCallbacksResponse;
+	TSharedPtr<FJsonObject> SimulationApiCallbacksResponseJson = ResponseMetaDataJson->GetObjectField(TEXT("api_callbacks_response"));
+	for (const TPair<const FString, FApiCallbacks> &SimulationApiCallback : SimulationApiCallbacks)
+	{
+		if (!SimulationApiCallbacksResponseJson->HasField(SimulationApiCallback.Key))
+		{
+			UE_LOG(LogMultiverseClient, Warning, TEXT("api_callbacks_response does not contain simulation [%s]"), *SimulationApiCallback.Key)
+			continue;
+		}
+
+		const TArray<TSharedPtr<FJsonValue>> ApiCallbacksResponseJsonValue = SimulationApiCallbacksResponseJson->GetArrayField(SimulationApiCallback.Key);
+		FApiCallbacks ApiCallbacks;
+		for (const TSharedPtr<FJsonValue> &ApiCallbackResponseJsonValue : ApiCallbacksResponseJsonValue)
+		{
+			for (const TPair<const FString, TSharedPtr<FJsonValue>> &ApiCallbackResponse : ApiCallbackResponseJsonValue->AsObject()->Values)
+			{
+				TArray<FString> Arguments;
+				for (const TSharedPtr<FJsonValue> &Argument : ApiCallbackResponse.Value->AsArray())
+				{
+					Arguments.Add(Argument->AsString());
+				}
+				ApiCallbacks.ApiCallbacks.Add(FApiCallback{ApiCallbackResponse.Key, Arguments});
+			}
+		}
+		ApiCallbacksResponse.Add(SimulationApiCallback.Key, ApiCallbacks);
+	}
+
+	return ApiCallbacksResponse;
+}
+
 UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const
 {
 	const FString ColorName = TEXT("M_") + ColorMap[Color];
@@ -319,18 +388,26 @@ UMaterial *FMultiverseClient::GetMaterial(const FLinearColor &Color) const
 
 bool FMultiverseClient::compute_request_and_response_meta_data()
 {
+	bComputingRequestAndResponseMetaData = true;
 	ResponseMetaDataJson = MakeShareable(new FJsonObject);
 	if (response_meta_data_str.empty())
 	{
+		bComputingRequestAndResponseMetaData = false;
 		return false;
 	}
 
 	FString ResponseMetaDataString(response_meta_data_str.c_str());
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseMetaDataString);
 
-	return FJsonSerializer::Deserialize(Reader, ResponseMetaDataJson) &&
-		   ResponseMetaDataJson->HasField("time") &&
-		   ResponseMetaDataJson->GetNumberField("time") >= 0;
+	UE_LOG(LogMultiverseClient, Log, TEXT("%s"), *ResponseMetaDataString)
+
+	bool bParseSuccess = FJsonSerializer::Deserialize(Reader, ResponseMetaDataJson) &&
+						 ResponseMetaDataJson->HasField("time") &&
+						 ResponseMetaDataJson->GetNumberField("time") >= 0.0;
+
+	bComputingRequestAndResponseMetaData = false;
+
+	return bParseSuccess;
 }
 
 void FMultiverseClient::compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const
@@ -404,12 +481,12 @@ bool FMultiverseClient::init_objects(bool from_request_meta_data)
 	if (SendObjects.Num() > 0)
 	{
 		SendObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
-							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
+							  { return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
 	}
 	if (ReceiveObjects.Num() > 0)
 	{
 		ReceiveObjects.ValueSort([](const FAttributeContainer &AttributeContainerA, const FAttributeContainer &AttributeContainerB)
-							{ return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
+								 { return AttributeContainerB.ObjectName.Compare(AttributeContainerA.ObjectName) > 0; });
 	}
 
 	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
@@ -464,7 +541,27 @@ void FMultiverseClient::wait_for_meta_data_thread_finish()
 
 void FMultiverseClient::bind_request_meta_data()
 {
+	TSharedPtr<FJsonObject> ApiCallbacks;
+	TArray<TSharedPtr<FJsonValue>> ApiCallbacksResponse;
+	if (RequestMetaDataJson && RequestMetaDataJson->HasField(TEXT("api_callbacks")))
+	{
+		ApiCallbacks = RequestMetaDataJson->GetObjectField(TEXT("api_callbacks"));
+	}
+	if (RequestMetaDataJson && RequestMetaDataJson->HasField(TEXT("api_callbacks_response")))
+	{
+		ApiCallbacksResponse = RequestMetaDataJson->GetArrayField(TEXT("api_callbacks_response"));
+	}
+
 	RequestMetaDataJson = MakeShareable(new FJsonObject);
+
+	if (ApiCallbacks)
+	{
+		RequestMetaDataJson->SetObjectField(TEXT("api_callbacks"), ApiCallbacks);
+	}
+	if (ApiCallbacksResponse.Num() > 0)
+	{
+		RequestMetaDataJson->SetArrayField(TEXT("api_callbacks_response"), ApiCallbacksResponse);
+	}
 
 	TSharedPtr<FJsonObject> MetaDataJson = MakeShareable(new FJsonObject);
 	MetaDataJson->SetStringField(TEXT("world_name"), WorldName);
@@ -629,12 +726,47 @@ void FMultiverseClient::bind_response_meta_data()
 
 void FMultiverseClient::bind_api_callbacks()
 {
-
+	if (!ResponseMetaDataJson->HasField(TEXT("api_callbacks")))
+	{
+		return;
+	}
+	for (const TSharedPtr<FJsonValue> &ApiCallbackJsonValue : ResponseMetaDataJson->GetArrayField(TEXT("api_callbacks")))
+	{
+		const TSharedPtr<FJsonObject> ApiCallbackJson = ApiCallbackJsonValue->AsObject();
+		for (const TPair<const FString, TSharedPtr<FJsonValue>> &ApiCallbackPair : ApiCallbackJson->Values)
+		{
+			if (ApiCallbackPair.Key.Compare(TEXT("is_unreal")) == 0)
+			{
+				// UE_LOG(LogMultiverseClient, Log, TEXT("Received!"))
+			}
+		}
+	}
 }
 
 void FMultiverseClient::bind_api_callbacks_response()
 {
-
+	if (!ResponseMetaDataJson->HasField(TEXT("api_callbacks")))
+	{
+		return;
+	}
+	TArray<TSharedPtr<FJsonValue>> ApiCallbacksResponse;
+	for (const TSharedPtr<FJsonValue> &ApiCallbackJsonValue : ResponseMetaDataJson->GetArrayField(TEXT("api_callbacks")))
+	{
+		const TSharedPtr<FJsonObject> ApiCallbackResponseJson = MakeShareable(new FJsonObject);
+		for (const TPair<const FString, TSharedPtr<FJsonValue>> &ApiCallbackPair : ApiCallbackJsonValue->AsObject()->Values)
+		{
+			if (ApiCallbackPair.Key.Compare(TEXT("is_unreal")) == 0)
+			{
+				ApiCallbackResponseJson->SetArrayField(ApiCallbackPair.Key, {MakeShareable(new FJsonValueString(TEXT("true")))});
+			}
+			else
+			{
+				ApiCallbackResponseJson->SetArrayField(ApiCallbackPair.Key, {MakeShareable(new FJsonValueString(TEXT("not implemented")))});
+			}
+			ApiCallbacksResponse.Add(MakeShareable(new FJsonValueObject(ApiCallbackResponseJson)));
+		}
+	}
+	RequestMetaDataJson->SetArrayField(TEXT("api_callbacks_response"), ApiCallbacksResponse);
 }
 
 void FMultiverseClient::init_send_and_receive_data()

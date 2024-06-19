@@ -29,10 +29,10 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-private:
-	void Init() const;
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Multiverse Client")
+	UMultiverseClientComponent* MultiverseClientComponent;
 
 private:
-	UPROPERTY(VisibleAnywhere, Category = "Multiverse Client")
-	UMultiverseClientComponent* MultiverseClientComponent;
+	void Init() const;
 };
