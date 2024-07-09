@@ -16,7 +16,11 @@ enum class EAttribute : uint8
 	JointRvalue,
 	JointTvalue,
 	Position,
-	Quaternion
+	Quaternion,
+	RGB_3840_2160,
+	RGB_1280_1024,
+	RGB_640_480,
+	RGB_128_128
 };
 
 USTRUCT(Blueprintable)

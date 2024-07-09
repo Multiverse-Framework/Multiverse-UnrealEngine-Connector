@@ -9,20 +9,26 @@
 #include "MultiverseAnim.h"
 #include "MultiverseClient.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "OculusXRHandComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include <chrono>
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
 
-const TMap<EAttribute, TArray<double>> AttributeDataMap =
+TMap<EAttribute, TArray<double>> AttributeDataMap =
 	{
 		{EAttribute::Position, {0.0, 0.0, 0.0}},
 		{EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
 		{EAttribute::JointRvalue, {0.0}},
 		{EAttribute::JointTvalue, {0.0}},
 		{EAttribute::JointPosition, {0.0, 0.0, 0.0}},
-		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
+		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}},
+		{EAttribute::RGB_3840_2160, TArray<double>()},
+		{EAttribute::RGB_1280_1024, TArray<double>()},
+		{EAttribute::RGB_640_480, TArray<double>()},
+		{EAttribute::RGB_128_128, TArray<double>()}};
 
 const TMap<FString, EAttribute> AttributeStringMap =
 	{
@@ -31,7 +37,11 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("joint_rvalue"), EAttribute::JointRvalue},
 		{TEXT("joint_tvalue"), EAttribute::JointTvalue},
 		{TEXT("joint_position"), EAttribute::JointPosition},
-		{TEXT("joint_quaternion"), EAttribute::JointQuaternion}};
+		{TEXT("joint_quaternion"), EAttribute::JointQuaternion},
+		{TEXT("rgb_3840_2160"), EAttribute::RGB_3840_2160},
+		{TEXT("rgb_1280_1024"), EAttribute::RGB_1280_1024},
+		{TEXT("rgb_640_480"), EAttribute::RGB_640_480},
+		{TEXT("rgb_128_128"), EAttribute::RGB_128_128}};
 
 const TArray<FString> HandBoneNames =
 	{
@@ -59,6 +69,11 @@ const TArray<FString> HandBoneNames =
 		TEXT("Pinky2"),
 		TEXT("Pinky3"),
 		TEXT("PinkyTip")};
+
+UTextureRenderTarget2D *RenderTarget_3840_2160;
+UTextureRenderTarget2D *RenderTarget_1280_1024;
+UTextureRenderTarget2D *RenderTarget_640_480;
+UTextureRenderTarget2D *RenderTarget_128_128;
 
 static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 const TPair<AActor *, FAttributeContainer> &Object,
@@ -174,6 +189,40 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
 				break;
 
+			case EAttribute::RGB_3840_2160: case EAttribute::RGB_1280_1024: case EAttribute::RGB_640_480: case EAttribute::RGB_128_128:
+			{
+				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
+				Object.Key->GetComponents(SceneCaptureComponents);
+				if (SceneCaptureComponents.Num() == 1)
+				{
+					if (Attribute == EAttribute::RGB_3840_2160)
+					{
+						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_3840_2160, Object.Key);
+						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_3840_2160"))));
+					}
+					else if (Attribute == EAttribute::RGB_1280_1024)
+					{
+						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_1280_1024, Object.Key);
+						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_1280_1024"))));
+					}
+					else if (Attribute == EAttribute::RGB_640_480)
+					{
+						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_640_480, Object.Key);
+						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_640_480"))));
+					}
+					else if (Attribute == EAttribute::RGB_128_128)
+					{
+						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_128_128, Object.Key);
+						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_128_128"))));
+					}
+				}
+				else
+				{
+					UE_LOG(LogMultiverseClient, Error, TEXT("SceneCaptureComponents.Num() of %s = %d"), *Object.Value.ObjectName, SceneCaptureComponents.Num())
+				}
+				break;
+			}
+
 			default:
 				break;
 			}
@@ -274,6 +323,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 
 FMultiverseClient::FMultiverseClient()
 {
+	AttributeDataMap[EAttribute::RGB_3840_2160].Init(0.0, 3840 * 2160);
+	AttributeDataMap[EAttribute::RGB_1280_1024].Init(0.0, 1280 * 1024);
+	AttributeDataMap[EAttribute::RGB_640_480].Init(0.0, 640 * 480);
+	AttributeDataMap[EAttribute::RGB_128_128].Init(0.0, 128 * 128);
+
 	ColorMap = {
 		{FLinearColor(0, 0, 1, 1), TEXT("Blue")},
 		{FLinearColor(0, 1, 1, 1), TEXT("Cyan")},
@@ -284,6 +338,46 @@ FMultiverseClient::FMultiverseClient()
 		{FLinearColor(1, 1, 0, 1), TEXT("Yellow")},
 		{FLinearColor(0.8, 0.1, 0, 1), TEXT("Orange")},
 		{FLinearColor(0.1, 0.1, 0.1, 1), TEXT("Gray")}};
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_3840_2160(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_3840_2160.RT_3840_2160'"));
+	if (RenderTargetAsset_3840_2160.Succeeded())
+	{
+		RenderTarget_3840_2160 = RenderTargetAsset_3840_2160.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_3840_2160"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_1280_1024(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_1280_1024.RT_1280_1024'"));
+	if (RenderTargetAsset_1280_1024.Succeeded())
+	{
+		RenderTarget_1280_1024 = RenderTargetAsset_1280_1024.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_1280_1024"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_640_480(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_640_480.RT_640_480'"));
+	if (RenderTargetAsset_640_480.Succeeded())
+	{
+		RenderTarget_640_480 = RenderTargetAsset_640_480.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_640_480"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_128_128(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_128_128.RT_128_128'"));
+	if (RenderTargetAsset_128_128.Succeeded())
+	{
+		RenderTarget_128_128 = RenderTargetAsset_128_128.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_128_128"))
+	}
 }
 
 void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
@@ -399,7 +493,7 @@ bool FMultiverseClient::compute_request_and_response_meta_data()
 	FString ResponseMetaDataString(response_meta_data_str.c_str());
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseMetaDataString);
 
-	UE_LOG(LogMultiverseClient, Log, TEXT("%s"), *ResponseMetaDataString)
+	// UE_LOG(LogMultiverseClient, Log, TEXT("%s"), *ResponseMetaDataString)
 
 	bool bParseSuccess = FJsonSerializer::Deserialize(Reader, ResponseMetaDataJson) &&
 						 ResponseMetaDataJson->HasField("time") &&
@@ -827,6 +921,46 @@ void FMultiverseClient::bind_send_data()
 				*send_buffer_addr++ = ActorQuat.X;
 				*send_buffer_addr++ = ActorQuat.Y;
 				*send_buffer_addr++ = ActorQuat.Z;
+				break;
+			}
+
+			case EAttribute::RGB_3840_2160: case EAttribute::RGB_1280_1024: case EAttribute::RGB_640_480: case EAttribute::RGB_128_128:
+			{
+				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
+				CachedActors[SendData.Key]->GetComponents(SceneCaptureComponents);
+				if (SceneCaptureComponents.Num() == 1)
+				{
+					USceneCaptureComponent2D *SceneCaptureComponent = SceneCaptureComponents[0];
+					if (SceneCaptureComponent->TextureTarget != nullptr)
+					{
+						FTextureRenderTargetResource *TextureRenderTargetResource = SceneCaptureComponent->TextureTarget->GameThread_GetRenderTargetResource();
+						TArray<FColor> ColorArray;
+						FReadSurfaceDataFlags ReadSurfaceDataFlags;
+						ReadSurfaceDataFlags.SetLinearToGamma(false);
+						TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
+
+						const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
+						if (DataSize != AttributeDataMap[SendData.Value].Num())
+						{
+							UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != AttributeDataMap[SendData.Value].Num() %d"), DataSize, AttributeDataMap[SendData.Value].Num())
+						}
+						else
+						{
+							for (int i = 0; i < DataSize; i++)
+							{
+								*send_buffer_addr++ = ColorArray[i].R * 1000000 + ColorArray[i].G * 1000 + ColorArray[i].B;
+							}
+						}
+					}
+					else
+					{
+						UE_LOG(LogMultiverseClient, Warning, TEXT("TextureTarget is nullptr"))
+					}
+				}
+				else
+				{
+					UE_LOG(LogMultiverseClient, Warning, TEXT("SceneCaptureComponents.Num() = %d"), SceneCaptureComponents.Num())
+				}
 				break;
 			}
 

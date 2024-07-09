@@ -44,15 +44,18 @@ public:
 
     /**
      * @brief Start the client
-     * 
+     *
      */
     void start();
 
     /**
      * @brief Communicate with the server
      *
+     * @param resend_request_meta_data
+     * @return true if the communication is successful
+     * @return false if the communication is not successful
      */
-    virtual void communicate(const bool resend_request_meta_data = false);
+    virtual bool communicate(const bool resend_request_meta_data = false);
 
     /**
      * @brief Send close signal to the server
@@ -155,14 +158,14 @@ protected:
 
     /**
      * @brief Bind the API callbacks
-     * 
-     * @param api_callbacks 
+     *
+     * @param api_callbacks
      */
     virtual void bind_api_callbacks() = 0;
 
     /**
      * @brief Bind the API callbacks response
-     * 
+     *
      */
     virtual void bind_api_callbacks_response() = 0;
 
@@ -192,7 +195,7 @@ protected:
 
     /**
      * @brief Reset the simulation
-     * 
+     *
      */
     virtual void reset() = 0;
 

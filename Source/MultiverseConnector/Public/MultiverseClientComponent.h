@@ -44,6 +44,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString SimulationName = TEXT("unreal");
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float UpdateRate = 1.0f;
+
 	UPROPERTY(EditAnywhere)
 	TMap<AActor*, FAttributeContainer> SendObjects;
 

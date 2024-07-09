@@ -77,9 +77,12 @@ void UMultiverseClientComponent::Tick(float DeltaTime)
         SimulationApiCallbacksResponse = MultiverseClient.CallApis(SimulationApiCallbacks);
     }
     
-    MultiverseClient.communicate();
+    if (CurrentCycleTime >= 1.f / UpdateRate)
+    {
+        MultiverseClient.communicate();
+    }
 
-    if (CurrentCycleTime >= 1.f / SimulationApiCallbacksRate)
+    if (CurrentCycleTime >= 1.f / UpdateRate || CurrentCycleTime >= 1.f / SimulationApiCallbacksRate)
     {
         CurrentCycleTime = 0.f;
     }
