@@ -120,11 +120,11 @@ private:
 
 	void bind_request_meta_data() override;
 
-	bool compute_request_and_response_meta_data() override;
+	bool compute_request_and_response_meta_data() override final;
 
-	void compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const override;
+	void compute_request_buffer_sizes(std::map<std::string, size_t> &send_buffer_size, std::map<std::string, size_t> &receive_buffer_size) const override final;
 
-	void compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const override;
+    void compute_response_buffer_sizes(std::map<std::string, size_t> &send_buffer_size, std::map<std::string, size_t> &receive_buffer_size) const override final;
 
 	void bind_api_callbacks() override;
 

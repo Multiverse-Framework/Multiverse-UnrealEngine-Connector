@@ -17,18 +17,21 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
 
-TMap<EAttribute, TArray<double>> AttributeDataMap =
+TMap<EAttribute, TArray<double>> AttributeDoubleDataMap =
 	{
 		{EAttribute::Position, {0.0, 0.0, 0.0}},
 		{EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
 		{EAttribute::JointRvalue, {0.0}},
 		{EAttribute::JointTvalue, {0.0}},
 		{EAttribute::JointPosition, {0.0, 0.0, 0.0}},
-		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}},
-		{EAttribute::RGB_3840_2160, TArray<double>()},
-		{EAttribute::RGB_1280_1024, TArray<double>()},
-		{EAttribute::RGB_640_480, TArray<double>()},
-		{EAttribute::RGB_128_128, TArray<double>()}};
+		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
+
+TMap<EAttribute, TArray<uint8_t>> AttributeUint8DataMap =
+	{
+		{EAttribute::RGB_3840_2160, TArray<uint8_t>()},
+		{EAttribute::RGB_1280_1024, TArray<uint8_t>()},
+		{EAttribute::RGB_640_480, TArray<uint8_t>()},
+		{EAttribute::RGB_128_128, TArray<uint8_t>()}};
 
 const TMap<FString, EAttribute> AttributeStringMap =
 	{
@@ -323,10 +326,10 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 
 FMultiverseClient::FMultiverseClient()
 {
-	AttributeDataMap[EAttribute::RGB_3840_2160].Init(0.0, 3840 * 2160);
-	AttributeDataMap[EAttribute::RGB_1280_1024].Init(0.0, 1280 * 1024);
-	AttributeDataMap[EAttribute::RGB_640_480].Init(0.0, 640 * 480);
-	AttributeDataMap[EAttribute::RGB_128_128].Init(0.0, 128 * 128);
+	AttributeUint8DataMap[EAttribute::RGB_3840_2160].Init(0, 3840 * 2160 * 3);
+	AttributeUint8DataMap[EAttribute::RGB_1280_1024].Init(0, 1280 * 1024 * 3);
+	AttributeUint8DataMap[EAttribute::RGB_640_480].Init(0, 640 * 480 * 3);
+	AttributeUint8DataMap[EAttribute::RGB_128_128].Init(0, 128 * 128 * 3);
 
 	ColorMap = {
 		{FLinearColor(0, 0, 1, 1), TEXT("Blue")},
@@ -504,67 +507,84 @@ bool FMultiverseClient::compute_request_and_response_meta_data()
 	return bParseSuccess;
 }
 
-void FMultiverseClient::compute_request_buffer_sizes(size_t &req_send_buffer_size, size_t &req_receive_buffer_size) const
+void FMultiverseClient::compute_request_buffer_sizes(std::map<std::string, size_t> &send_buffer_size, std::map<std::string, size_t> &receive_buffer_size) const
 {
-	TMap<FString, size_t> RequestBufferSizes = {{TEXT("send"), 1}, {TEXT("receive"), 1}};
+	TMap<FString, TMap<FString, size_t>> RequestBufferSizes = {{TEXT("send"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}, {TEXT("receive"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}};
 
-	for (TPair<FString, size_t> &RequestBufferSize : RequestBufferSizes)
+	for (TPair<FString, TMap<FString, size_t>> &RequestBufferSize : RequestBufferSizes)
 	{
+		RequestBufferSize.Value[TEXT("double")] = 0;
+		RequestBufferSize.Value[TEXT("uint8")] = 0;
 		if (!RequestMetaDataJson->HasField(RequestBufferSize.Key))
 		{
-			break;
+			continue;
 		}
-
-		for (const TPair<FString, TSharedPtr<FJsonValue>> &SendObjectJson : RequestMetaDataJson->GetObjectField(RequestBufferSize.Key)->Values)
+		for (const TPair<FString, TSharedPtr<FJsonValue>> &ObjectJson : RequestMetaDataJson->GetObjectField(RequestBufferSize.Key)->Values)
 		{
-			if (SendObjectJson.Key.Compare(TEXT("")) == 0)
+			if (ObjectJson.Key.Compare(TEXT("")) == 0 || RequestBufferSize.Value[TEXT("double")] == -1 || RequestBufferSize.Value[TEXT("uint8")] == -1)
 			{
-				RequestBufferSize.Value = -1;
+				RequestBufferSize.Value[TEXT("double")] = -1;
+				RequestBufferSize.Value[TEXT("uint8")] = -1;
 				break;
 			}
 
-			for (const TSharedPtr<FJsonValue> &SendObjectAttribute : SendObjectJson.Value->AsArray())
+			for (const TSharedPtr<FJsonValue> &ObjectAttributeJson : ObjectJson.Value->AsArray())
 			{
-				if (SendObjectAttribute->AsString().Compare(TEXT("")) == 0)
+				const FString ObjectAttribute = ObjectAttributeJson->AsString();
+				if (ObjectAttribute.Compare(TEXT("")) == 0)
 				{
-					RequestBufferSize.Value = -1;
+					RequestBufferSize.Value[TEXT("double")] = -1;
+					RequestBufferSize.Value[TEXT("uint8")] = -1;
 					break;
 				}
 
-				if (AttributeStringMap.Contains(SendObjectAttribute->AsString()))
+				if (AttributeStringMap.Contains(ObjectAttribute) && AttributeDoubleDataMap.Contains(AttributeStringMap[ObjectAttribute]))
 				{
-					RequestBufferSize.Value += AttributeDataMap[AttributeStringMap[SendObjectAttribute->AsString()]].Num();
+					RequestBufferSize.Value[TEXT("double")] += AttributeDoubleDataMap[AttributeStringMap[ObjectAttribute]].Num();
+				}
+				else if (AttributeStringMap.Contains(ObjectAttribute) && AttributeUint8DataMap.Contains(AttributeStringMap[ObjectAttribute]))
+				{
+					RequestBufferSize.Value[TEXT("uint8")] += AttributeUint8DataMap[AttributeStringMap[ObjectAttribute]].Num();
 				}
 			}
 		}
 	}
 
-	req_send_buffer_size = RequestBufferSizes[TEXT("send")];
-	req_receive_buffer_size = RequestBufferSizes[TEXT("receive")];
+	send_buffer_size = {{"double", RequestBufferSizes[TEXT("send")][TEXT("double")]}, {"uint8", RequestBufferSizes[TEXT("send")][TEXT("uint8")]}};
+	receive_buffer_size = {{"double", RequestBufferSizes[TEXT("receive")][TEXT("double")]}, {"uint8", RequestBufferSizes[TEXT("receive")][TEXT("uint8")]}};
 }
 
-void FMultiverseClient::compute_response_buffer_sizes(size_t &res_send_buffer_size, size_t &res_receive_buffer_size) const
+void FMultiverseClient::compute_response_buffer_sizes(std::map<std::string, size_t> &send_buffer_size, std::map<std::string, size_t> &receive_buffer_size) const
 {
-	TMap<FString, size_t> ResponseBufferSizes = {{TEXT("send"), 1}, {TEXT("receive"), 1}};
+	TMap<FString, TMap<FString, size_t>> ResponseBufferSizes = {{TEXT("send"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}, {TEXT("receive"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}};
 
-	for (TPair<FString, size_t> &ResponseBufferSize : ResponseBufferSizes)
+	for (TPair<FString, TMap<FString, size_t>> &ResponseBufferSize : ResponseBufferSizes)
 	{
+		ResponseBufferSize.Value[TEXT("double")] = 0;
+		ResponseBufferSize.Value[TEXT("uint8")] = 0;
 		if (!ResponseMetaDataJson->HasField(ResponseBufferSize.Key))
 		{
 			continue;
 		}
-
-		for (const TPair<FString, TSharedPtr<FJsonValue>> &ReceiveObject : ResponseMetaDataJson->GetObjectField(ResponseBufferSize.Key)->Values)
+		for (const TPair<FString, TSharedPtr<FJsonValue>> &ObjectJson : ResponseMetaDataJson->GetObjectField(ResponseBufferSize.Key)->Values)
 		{
-			for (const TPair<FString, TSharedPtr<FJsonValue>> &ReceiveObjectData : ReceiveObject.Value->AsObject()->Values)
+			for (const TPair<FString, TSharedPtr<FJsonValue>> &ObjectData : ObjectJson.Value->AsObject()->Values)
 			{
-				ResponseBufferSize.Value += ReceiveObjectData.Value->AsArray().Num();
+				const FString ObjectAttribute = ObjectData.Key;
+				if (AttributeStringMap.Contains(ObjectAttribute) && AttributeDoubleDataMap.Contains(AttributeStringMap[ObjectAttribute]))
+				{
+					ResponseBufferSize.Value[TEXT("double")] += ObjectData.Value->AsArray().Num();
+				}
+				else if (AttributeStringMap.Contains(ObjectAttribute) && AttributeUint8DataMap.Contains(AttributeStringMap[ObjectAttribute]))
+				{
+					ResponseBufferSize.Value[TEXT("uint8")] += ObjectData.Value->AsArray().Num();
+				}
 			}
 		}
 	}
 
-	res_send_buffer_size = ResponseBufferSizes[TEXT("send")];
-	res_receive_buffer_size = ResponseBufferSizes[TEXT("receive")];
+	send_buffer_size = {{"double", ResponseBufferSizes[TEXT("send")][TEXT("double")]}, {"uint8", ResponseBufferSizes[TEXT("send")][TEXT("uint8")]}};
+	receive_buffer_size = {{"double", ResponseBufferSizes[TEXT("receive")][TEXT("double")]}, {"uint8", ResponseBufferSizes[TEXT("receive")][TEXT("uint8")]}};
 }
 
 bool FMultiverseClient::init_objects(bool from_request_meta_data)
@@ -890,8 +910,13 @@ void FMultiverseClient::init_send_and_receive_data()
 
 void FMultiverseClient::bind_send_data()
 {
-	send_buffer[0] = FPlatformTime::Seconds() - StartTime;
-	double *send_buffer_addr = send_buffer + 1;
+	*world_time = FPlatformTime::Seconds() - StartTime;
+	if (*world_time < 0.0)
+	{
+		*world_time = 0.0;
+	}
+	double *send_buffer_double_addr = send_buffer.buffer_double.data;
+	uint8_t *send_buffer_uint8_addr = send_buffer.buffer_uint8_t.data;
 
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
 	{
@@ -908,19 +933,19 @@ void FMultiverseClient::bind_send_data()
 			case EAttribute::Position:
 			{
 				const FVector ActorLocation = CachedActors[SendData.Key]->GetActorLocation();
-				*send_buffer_addr++ = ActorLocation.X;
-				*send_buffer_addr++ = ActorLocation.Y;
-				*send_buffer_addr++ = ActorLocation.Z;
+				*send_buffer_double_addr++ = ActorLocation.X;
+				*send_buffer_double_addr++ = ActorLocation.Y;
+				*send_buffer_double_addr++ = ActorLocation.Z;
 				break;
 			}
 
 			case EAttribute::Quaternion:
 			{
 				const FQuat ActorQuat = CachedActors[SendData.Key]->GetActorQuat();
-				*send_buffer_addr++ = ActorQuat.W;
-				*send_buffer_addr++ = ActorQuat.X;
-				*send_buffer_addr++ = ActorQuat.Y;
-				*send_buffer_addr++ = ActorQuat.Z;
+				*send_buffer_double_addr++ = ActorQuat.W;
+				*send_buffer_double_addr++ = ActorQuat.X;
+				*send_buffer_double_addr++ = ActorQuat.Y;
+				*send_buffer_double_addr++ = ActorQuat.Z;
 				break;
 			}
 
@@ -940,15 +965,17 @@ void FMultiverseClient::bind_send_data()
 						TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
 
 						const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
-						if (DataSize != AttributeDataMap[SendData.Value].Num())
+						if (DataSize * 3 != AttributeUint8DataMap[SendData.Value].Num())
 						{
-							UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != AttributeDataMap[SendData.Value].Num() %d"), DataSize, AttributeDataMap[SendData.Value].Num())
+							UE_LOG(LogMultiverseClient, Warning, TEXT("3 * DataSize %d != AttributeUint8DataMap[SendData.Value].Num() %d"), 3 * DataSize, AttributeUint8DataMap[SendData.Value].Num())
 						}
 						else
 						{
 							for (int i = 0; i < DataSize; i++)
 							{
-								*send_buffer_addr++ = ColorArray[i].R * 1000000 + ColorArray[i].G * 1000 + ColorArray[i].B;
+								*send_buffer_uint8_addr++ = ColorArray[i].R;
+								*send_buffer_uint8_addr++ = ColorArray[i].G;
+								*send_buffer_uint8_addr++ = ColorArray[i].B;
 							}
 						}
 					}
@@ -975,14 +1002,14 @@ void FMultiverseClient::bind_send_data()
 			case EAttribute::JointRvalue:
 			{
 				const FQuat JointQuaternion = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetRotation();
-				*send_buffer_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
+				*send_buffer_double_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
 				break;
 			}
 
 			case EAttribute::JointTvalue:
 			{
 				const FVector JointPosition = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetTranslation();
-				*send_buffer_addr++ = JointPosition.Y;
+				*send_buffer_double_addr++ = JointPosition.Y;
 				break;
 			}
 
@@ -1010,18 +1037,18 @@ void FMultiverseClient::bind_send_data()
 						if (SendData.Value == EAttribute::Position)
 						{
 							const FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
-							*send_buffer_addr++ = BoneLocation.X;
-							*send_buffer_addr++ = BoneLocation.Y;
-							*send_buffer_addr++ = BoneLocation.Z;
+							*send_buffer_double_addr++ = BoneLocation.X;
+							*send_buffer_double_addr++ = BoneLocation.Y;
+							*send_buffer_double_addr++ = BoneLocation.Z;
 						}
 						else if (SendData.Value == EAttribute::Quaternion)
 						{
 							const FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
 							const FQuat BoneQuat = BoneRotator.Quaternion();
-							*send_buffer_addr++ = BoneQuat.W;
-							*send_buffer_addr++ = BoneQuat.X;
-							*send_buffer_addr++ = BoneQuat.Y;
-							*send_buffer_addr++ = BoneQuat.Z;
+							*send_buffer_double_addr++ = BoneQuat.W;
+							*send_buffer_double_addr++ = BoneQuat.X;
+							*send_buffer_double_addr++ = BoneQuat.Y;
+							*send_buffer_double_addr++ = BoneQuat.Z;
 						}
 					}
 				}
@@ -1032,7 +1059,7 @@ void FMultiverseClient::bind_send_data()
 
 void FMultiverseClient::bind_receive_data()
 {
-	double *receive_buffer_addr = receive_buffer + 1;
+	double *receive_buffer_double_addr = receive_buffer.buffer_double.data;
 	for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
 	{
 		if (CachedActors.Contains(ReceiveData.Key))
@@ -1047,19 +1074,19 @@ void FMultiverseClient::bind_receive_data()
 			{
 			case EAttribute::Position:
 			{
-				const double X = *receive_buffer_addr++;
-				const double Y = *receive_buffer_addr++;
-				const double Z = *receive_buffer_addr++;
+				const double X = *receive_buffer_double_addr++;
+				const double Y = *receive_buffer_double_addr++;
+				const double Z = *receive_buffer_double_addr++;
 				CachedActors[ReceiveData.Key]->SetActorLocation(FVector(X, Y, Z));
 				break;
 			}
 
 			case EAttribute::Quaternion:
 			{
-				const double W = *receive_buffer_addr++;
-				const double X = *receive_buffer_addr++;
-				const double Y = *receive_buffer_addr++;
-				const double Z = *receive_buffer_addr++;
+				const double W = *receive_buffer_double_addr++;
+				const double X = *receive_buffer_double_addr++;
+				const double Y = *receive_buffer_double_addr++;
+				const double Z = *receive_buffer_double_addr++;
 				CachedActors[ReceiveData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
 				break;
 			}
@@ -1074,14 +1101,14 @@ void FMultiverseClient::bind_receive_data()
 			{
 			case EAttribute::JointRvalue:
 			{
-				const double JointRvalue = *receive_buffer_addr++;
+				const double JointRvalue = *receive_buffer_double_addr++;
 				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
 				break;
 			}
 
 			case EAttribute::JointTvalue:
 			{
-				const double JointTvalue = *receive_buffer_addr++;
+				const double JointTvalue = *receive_buffer_double_addr++;
 				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
 				break;
 			}
