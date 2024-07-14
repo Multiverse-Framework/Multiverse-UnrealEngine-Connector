@@ -72,19 +72,24 @@ void UMultiverseClientComponent::Init()
 void UMultiverseClientComponent::Tick(float DeltaTime)
 {
     CurrentCycleTime += DeltaTime;
-    if (SimulationApiCallbacks.Num() > 0 && bSimulationApiCallbacksEnabled && CurrentCycleTime >= 1.f / SimulationApiCallbacksRate)
+    CurrentSimulationApiCycleTime += DeltaTime;
+    if (SimulationApiCallbacks.Num() > 0 && bSimulationApiCallbacksEnabled && CurrentSimulationApiCycleTime >= 1.f / SimulationApiCallbacksRate)
     {
         SimulationApiCallbacksResponse = MultiverseClient.CallApis(SimulationApiCallbacks);
     }
     
-    if (CurrentCycleTime >= 1.f / UpdateRate)
+    if (CurrentCycleTime >= 1.f / UpdateRate || CurrentSimulationApiCycleTime >= 1.f / SimulationApiCallbacksRate)
     {
         MultiverseClient.communicate();
     }
 
-    if (CurrentCycleTime >= 1.f / UpdateRate || CurrentCycleTime >= 1.f / SimulationApiCallbacksRate)
+    if (CurrentCycleTime >= 1.f / UpdateRate)
     {
         CurrentCycleTime = 0.f;
+    }
+    if (CurrentSimulationApiCycleTime >= 1.f / SimulationApiCallbacksRate)
+    {
+        CurrentSimulationApiCycleTime = 0.f;
     }
 }
 

@@ -69,4 +69,6 @@ private:
 	FMultiverseClient MultiverseClient;
 
 	float CurrentCycleTime = 0.f;
+
+	float CurrentSimulationApiCycleTime = 0.f;
 };
