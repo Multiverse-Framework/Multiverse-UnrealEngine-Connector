@@ -99,6 +99,8 @@ private:
 
 	TMap<FString, AActor *> CachedActors;
 
+	TMap<FString, UActorComponent *> CachedComponents;
+
 	TMap<FString, TPair<class UMultiverseAnim *, FName>> CachedBoneNames;
 
 	TMap<FLinearColor, FString> ColorMap;

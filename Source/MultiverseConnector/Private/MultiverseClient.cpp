@@ -11,6 +11,7 @@
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Camera/CameraComponent.h"
 #include "OculusXRHandComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include <chrono>
@@ -81,6 +82,7 @@ UTextureRenderTarget2D *RenderTarget_128_128;
 static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 const TPair<AActor *, FAttributeContainer> &Object,
 						 TMap<FString, AActor *> &CachedActors,
+						 TMap<FString, UActorComponent *> &CachedComponents,
 						 TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
 {
 	if (Object.Key->IsA(ASkeletalMeshActor::StaticClass()))
@@ -148,6 +150,56 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	}
 	else if (Object.Key->IsA(APawn::StaticClass()))
 	{
+		TArray<UCameraComponent *> CameraComponents;
+		Object.Key->GetComponents(CameraComponents);
+		if (CameraComponents.Num() == 1)
+		{
+			CachedComponents.Add(Object.Value.ObjectName, CameraComponents[0]);
+			TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+			for (const EAttribute &Attribute : Object.Value.Attributes)
+			{
+				switch (Attribute)
+				{
+				case EAttribute::Position:
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+					break;
+
+				case EAttribute::Quaternion:
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+					break;
+
+				default:
+					break;
+				}
+			}
+			MetaDataJson->SetArrayField(Object.Value.ObjectName, AttributeJsonArray);
+		}
+
+		TArray<USkeletalMeshComponent *> SkeletalMeshComponents;
+		Object.Key->GetComponents(SkeletalMeshComponents, true);
+		for (USkeletalMeshComponent *SkeletalMeshComponent : SkeletalMeshComponents)
+		{
+			CachedComponents.Add(SkeletalMeshComponent->GetName(), SkeletalMeshComponent);
+			TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+			for (const EAttribute &Attribute : Object.Value.Attributes)
+			{
+				switch (Attribute)
+				{
+				case EAttribute::Position:
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+					break;
+
+				case EAttribute::Quaternion:
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+					break;
+
+				default:
+					break;
+				}
+				MetaDataJson->SetArrayField(SkeletalMeshComponent->GetName(), AttributeJsonArray);
+			}
+		}
+
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
 			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
@@ -291,6 +343,38 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 	}
 	else if (Object.Key->IsA(APawn::StaticClass()))
 	{
+		TArray<UCameraComponent *> CameraComponents;
+		Object.Key->GetComponents(CameraComponents);
+		if (CameraComponents.Num() == 1)
+		{
+			if (Object.Value.Attributes.Contains(EAttribute::Position))
+			{
+				DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Position));
+			}
+			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
+			{
+				DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Quaternion));
+			}
+		}
+		else
+		{
+			UE_LOG(LogMultiverseClient, Error, TEXT("CameraComponents.Num() of %s = %d"), *Object.Value.ObjectName, CameraComponents.Num())
+		}
+
+		TArray<USkeletalMeshComponent *> SkeletalMeshComponents;
+		Object.Key->GetComponents(SkeletalMeshComponents, true);
+		for (USkeletalMeshComponent *SkeletalMeshComponent : SkeletalMeshComponents)
+		{
+			if (Object.Value.Attributes.Contains(EAttribute::Position))
+			{
+				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Position));
+			}
+			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
+			{
+				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Quaternion));
+			}
+		}
+
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
 			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
@@ -302,7 +386,6 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 					{
 						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Position));
 					}
-
 					if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 					{
 						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Quaternion));
@@ -699,7 +782,7 @@ void FMultiverseClient::bind_request_meta_data()
 			continue;
 		}
 
-		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("send")), SendObject, CachedActors, CachedBoneNames);
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("send")), SendObject, CachedActors, CachedComponents, CachedBoneNames);
 	}
 
 	for (const TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
@@ -710,7 +793,7 @@ void FMultiverseClient::bind_request_meta_data()
 			continue;
 		}
 
-		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObject, CachedActors, CachedBoneNames);
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObject, CachedActors, CachedComponents, CachedBoneNames);
 	}
 
 	FString RequestMetaDataString;
@@ -1019,6 +1102,53 @@ void FMultiverseClient::bind_send_data()
 		}
 		else
 		{
+			if (CachedComponents.Contains(SendData.Key))
+			{
+				if (UCameraComponent *CameraComponent = Cast<UCameraComponent>(CachedComponents[SendData.Key]))
+				{
+					if (SendData.Value == EAttribute::Position)
+					{
+						const FVector CameraLocation = CameraComponent->GetComponentLocation();
+						*send_buffer_double_addr++ = CameraLocation.X;
+						*send_buffer_double_addr++ = CameraLocation.Y;
+						*send_buffer_double_addr++ = CameraLocation.Z;
+					}
+					else if (SendData.Value == EAttribute::Quaternion)
+					{
+						const FQuat CameraQuat = CameraComponent->GetComponentQuat();
+						*send_buffer_double_addr++ = CameraQuat.W;
+						*send_buffer_double_addr++ = CameraQuat.X;
+						*send_buffer_double_addr++ = CameraQuat.Y;
+						*send_buffer_double_addr++ = CameraQuat.Z;
+					}
+				}
+				else if (USkeletalMeshComponent *SkeletalMeshComponent = Cast<USkeletalMeshComponent>(CachedComponents[SendData.Key]))
+				{
+					if (SendData.Value == EAttribute::Position)
+					{
+						const FVector HandLocation = SkeletalMeshComponent->GetComponentLocation();
+						*send_buffer_double_addr++ = HandLocation.X;
+						*send_buffer_double_addr++ = HandLocation.Y;
+						*send_buffer_double_addr++ = HandLocation.Z;
+					}
+					else if (SendData.Value == EAttribute::Quaternion)
+					{
+						const FQuat HandQuat = SkeletalMeshComponent->GetComponentQuat();
+						*send_buffer_double_addr++ = HandQuat.W;
+						*send_buffer_double_addr++ = HandQuat.X;
+						*send_buffer_double_addr++ = HandQuat.Y;
+						*send_buffer_double_addr++ = HandQuat.Z;
+					}
+				}
+				else
+				{
+					UE_LOG(LogMultiverseClient, Error, TEXT("This should not happen"))
+				}
+			}
+			else
+			{
+				UE_LOG(LogMultiverseClient, Error, TEXT("CachedComponents does not contain %s"), *SendData.Key)
+			}
 			APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
 			for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 			{
