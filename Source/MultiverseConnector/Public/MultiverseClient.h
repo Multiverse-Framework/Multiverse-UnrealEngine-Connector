@@ -20,7 +20,11 @@ enum class EAttribute : uint8
 	RGB_3840_2160,
 	RGB_1280_1024,
 	RGB_640_480,
-	RGB_128_128
+	RGB_128_128,
+	Depth_3840_2160,
+	Depth_1280_1024,
+	Depth_640_480,
+	Depth_128_128
 };
 
 USTRUCT(Blueprintable)

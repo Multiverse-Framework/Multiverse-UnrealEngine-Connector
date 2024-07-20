@@ -34,6 +34,13 @@ TMap<EAttribute, TArray<uint8_t>> AttributeUint8DataMap =
 		{EAttribute::RGB_640_480, TArray<uint8_t>()},
 		{EAttribute::RGB_128_128, TArray<uint8_t>()}};
 
+TMap<EAttribute, TArray<uint16_t>> AttributeUint16DataMap =
+	{
+		{EAttribute::Depth_3840_2160, TArray<uint16_t>()},
+		{EAttribute::Depth_1280_1024, TArray<uint16_t>()},
+		{EAttribute::Depth_640_480, TArray<uint16_t>()},
+		{EAttribute::Depth_128_128, TArray<uint16_t>()}};
+
 const TMap<FString, EAttribute> AttributeStringMap =
 	{
 		{TEXT("position"), EAttribute::Position},
@@ -45,7 +52,11 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("rgb_3840_2160"), EAttribute::RGB_3840_2160},
 		{TEXT("rgb_1280_1024"), EAttribute::RGB_1280_1024},
 		{TEXT("rgb_640_480"), EAttribute::RGB_640_480},
-		{TEXT("rgb_128_128"), EAttribute::RGB_128_128}};
+		{TEXT("rgb_128_128"), EAttribute::RGB_128_128},
+		{TEXT("depth_3840_2160"), EAttribute::Depth_3840_2160},
+		{TEXT("depth_1280_1024"), EAttribute::Depth_1280_1024},
+		{TEXT("depth_640_480"), EAttribute::Depth_640_480},
+		{TEXT("depth_128_128"), EAttribute::Depth_128_128}};
 
 const TArray<FString> HandBoneNames =
 	{
@@ -413,6 +424,11 @@ FMultiverseClient::FMultiverseClient()
 	AttributeUint8DataMap[EAttribute::RGB_1280_1024].Init(0, 1280 * 1024 * 3);
 	AttributeUint8DataMap[EAttribute::RGB_640_480].Init(0, 640 * 480 * 3);
 	AttributeUint8DataMap[EAttribute::RGB_128_128].Init(0, 128 * 128 * 3);
+
+	AttributeUint16DataMap[EAttribute::Depth_3840_2160].Init(0, 3840 * 2160);
+	AttributeUint16DataMap[EAttribute::Depth_1280_1024].Init(0, 1280 * 1024);
+	AttributeUint16DataMap[EAttribute::Depth_640_480].Init(0, 640 * 480);
+	AttributeUint16DataMap[EAttribute::Depth_128_128].Init(0, 128 * 128);
 
 	ColorMap = {
 		{FLinearColor(0, 0, 1, 1), TEXT("Blue")},
