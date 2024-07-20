@@ -255,8 +255,14 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
 				break;
 
-			case EAttribute::RGB_3840_2160: case EAttribute::RGB_1280_1024: case EAttribute::RGB_640_480: case EAttribute::RGB_128_128:
-			case EAttribute::Depth_3840_2160: case EAttribute::Depth_1280_1024: case EAttribute::Depth_640_480: case EAttribute::Depth_128_128:
+			case EAttribute::RGB_3840_2160:
+			case EAttribute::RGB_1280_1024:
+			case EAttribute::RGB_640_480:
+			case EAttribute::RGB_128_128:
+			case EAttribute::Depth_3840_2160:
+			case EAttribute::Depth_1280_1024:
+			case EAttribute::Depth_640_480:
+			case EAttribute::Depth_128_128:
 			{
 				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
 				Object.Key->GetComponents(SceneCaptureComponents);
@@ -543,9 +549,9 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 
 	printf("ServerSocketAddr: %s\n", server_socket_addr.c_str());
 
-	StartTime = FPlatformTime::Seconds();
-
 	connect();
+
+	StartTime = FPlatformTime::Seconds();
 }
 
 TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FApiCallbacks> &SimulationApiCallbacks)
@@ -649,22 +655,27 @@ bool FMultiverseClient::compute_request_and_response_meta_data()
 
 void FMultiverseClient::compute_request_buffer_sizes(std::map<std::string, size_t> &send_buffer_size, std::map<std::string, size_t> &receive_buffer_size) const
 {
-	TMap<FString, TMap<FString, size_t>> RequestBufferSizes = {{TEXT("send"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}, {TEXT("receive"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}};
+	TMap<FString, TMap<FString, size_t>> RequestBufferSizes = {{TEXT("send"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}, {TEXT("uint16"), 0}}}, {TEXT("receive"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}, {TEXT("uint16"), 0}}}};
 
 	for (TPair<FString, TMap<FString, size_t>> &RequestBufferSize : RequestBufferSizes)
 	{
 		RequestBufferSize.Value[TEXT("double")] = 0;
 		RequestBufferSize.Value[TEXT("uint8")] = 0;
+		RequestBufferSize.Value[TEXT("uint16")] = 0;
 		if (!RequestMetaDataJson->HasField(RequestBufferSize.Key))
 		{
 			continue;
 		}
 		for (const TPair<FString, TSharedPtr<FJsonValue>> &ObjectJson : RequestMetaDataJson->GetObjectField(RequestBufferSize.Key)->Values)
 		{
-			if (ObjectJson.Key.Compare(TEXT("")) == 0 || RequestBufferSize.Value[TEXT("double")] == -1 || RequestBufferSize.Value[TEXT("uint8")] == -1)
+			if (ObjectJson.Key.Compare(TEXT("")) == 0 ||
+				RequestBufferSize.Value[TEXT("double")] == -1 ||
+				RequestBufferSize.Value[TEXT("uint8")] == -1 ||
+				RequestBufferSize.Value[TEXT("uint16")] == -1)
 			{
 				RequestBufferSize.Value[TEXT("double")] = -1;
 				RequestBufferSize.Value[TEXT("uint8")] = -1;
+				RequestBufferSize.Value[TEXT("uint16")] = -1;
 				break;
 			}
 
@@ -675,6 +686,7 @@ void FMultiverseClient::compute_request_buffer_sizes(std::map<std::string, size_
 				{
 					RequestBufferSize.Value[TEXT("double")] = -1;
 					RequestBufferSize.Value[TEXT("uint8")] = -1;
+					RequestBufferSize.Value[TEXT("uint16")] = -1;
 					break;
 				}
 
@@ -686,22 +698,31 @@ void FMultiverseClient::compute_request_buffer_sizes(std::map<std::string, size_
 				{
 					RequestBufferSize.Value[TEXT("uint8")] += AttributeUint8DataMap[AttributeStringMap[ObjectAttribute]].Num();
 				}
+				else if (AttributeStringMap.Contains(ObjectAttribute) && AttributeUint16DataMap.Contains(AttributeStringMap[ObjectAttribute]))
+				{
+					RequestBufferSize.Value[TEXT("uint16")] += AttributeUint16DataMap[AttributeStringMap[ObjectAttribute]].Num();
+				}
 			}
 		}
 	}
 
-	send_buffer_size = {{"double", RequestBufferSizes[TEXT("send")][TEXT("double")]}, {"uint8", RequestBufferSizes[TEXT("send")][TEXT("uint8")]}};
-	receive_buffer_size = {{"double", RequestBufferSizes[TEXT("receive")][TEXT("double")]}, {"uint8", RequestBufferSizes[TEXT("receive")][TEXT("uint8")]}};
+	send_buffer_size = {{"double", RequestBufferSizes[TEXT("send")][TEXT("double")]},
+						{"uint8", RequestBufferSizes[TEXT("send")][TEXT("uint8")]},
+						{"uint16", RequestBufferSizes[TEXT("send")][TEXT("uint16")]}};
+	receive_buffer_size = {{"double", RequestBufferSizes[TEXT("receive")][TEXT("double")]},
+						   {"uint8", RequestBufferSizes[TEXT("receive")][TEXT("uint8")]},
+						   {"uint16", RequestBufferSizes[TEXT("receive")][TEXT("uint16")]}};
 }
 
 void FMultiverseClient::compute_response_buffer_sizes(std::map<std::string, size_t> &send_buffer_size, std::map<std::string, size_t> &receive_buffer_size) const
 {
-	TMap<FString, TMap<FString, size_t>> ResponseBufferSizes = {{TEXT("send"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}, {TEXT("receive"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}}}};
+	TMap<FString, TMap<FString, size_t>> ResponseBufferSizes = {{TEXT("send"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}, {TEXT("uint16"), 0}}}, {TEXT("receive"), {{TEXT("double"), 0}, {TEXT("uint8"), 0}, {TEXT("uint16"), 0}}}};
 
 	for (TPair<FString, TMap<FString, size_t>> &ResponseBufferSize : ResponseBufferSizes)
 	{
 		ResponseBufferSize.Value[TEXT("double")] = 0;
 		ResponseBufferSize.Value[TEXT("uint8")] = 0;
+		ResponseBufferSize.Value[TEXT("uint16")] = 0;
 		if (!ResponseMetaDataJson->HasField(ResponseBufferSize.Key))
 		{
 			continue;
@@ -719,12 +740,20 @@ void FMultiverseClient::compute_response_buffer_sizes(std::map<std::string, size
 				{
 					ResponseBufferSize.Value[TEXT("uint8")] += ObjectData.Value->AsArray().Num();
 				}
+				else if (AttributeStringMap.Contains(ObjectAttribute) && AttributeUint16DataMap.Contains(AttributeStringMap[ObjectAttribute]))
+				{
+					ResponseBufferSize.Value[TEXT("uint16")] += ObjectData.Value->AsArray().Num();
+				}
 			}
 		}
 	}
 
-	send_buffer_size = {{"double", ResponseBufferSizes[TEXT("send")][TEXT("double")]}, {"uint8", ResponseBufferSizes[TEXT("send")][TEXT("uint8")]}};
-	receive_buffer_size = {{"double", ResponseBufferSizes[TEXT("receive")][TEXT("double")]}, {"uint8", ResponseBufferSizes[TEXT("receive")][TEXT("uint8")]}};
+	send_buffer_size = {{"double", ResponseBufferSizes[TEXT("send")][TEXT("double")]},
+						{"uint8", ResponseBufferSizes[TEXT("send")][TEXT("uint8")]},
+						{"uint16", ResponseBufferSizes[TEXT("send")][TEXT("uint16")]}};
+	receive_buffer_size = {{"double", ResponseBufferSizes[TEXT("receive")][TEXT("double")]},
+						   {"uint8", ResponseBufferSizes[TEXT("receive")][TEXT("uint8")]},
+						   {"uint16", ResponseBufferSizes[TEXT("receive")][TEXT("uint16")]}};
 }
 
 bool FMultiverseClient::init_objects(bool from_request_meta_data)
@@ -1090,8 +1119,14 @@ void FMultiverseClient::bind_send_data()
 				break;
 			}
 
-			case EAttribute::RGB_3840_2160: case EAttribute::RGB_1280_1024: case EAttribute::RGB_640_480: case EAttribute::RGB_128_128:
-			case EAttribute::Depth_3840_2160: case EAttribute::Depth_1280_1024: case EAttribute::Depth_640_480: case EAttribute::Depth_128_128:
+			case EAttribute::RGB_3840_2160:
+			case EAttribute::RGB_1280_1024:
+			case EAttribute::RGB_640_480:
+			case EAttribute::RGB_128_128:
+			case EAttribute::Depth_3840_2160:
+			case EAttribute::Depth_1280_1024:
+			case EAttribute::Depth_640_480:
+			case EAttribute::Depth_128_128:
 			{
 				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
 				CachedActors[SendData.Key]->GetComponents(SceneCaptureComponents);
@@ -1107,9 +1142,10 @@ void FMultiverseClient::bind_send_data()
 						TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
 
 						const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
-						if (DataSize * 3 != AttributeUint8DataMap[SendData.Value].Num())
+						const int ExpectedDataSize = AttributeUint8DataMap.Contains(SendData.Value) ? AttributeUint8DataMap[SendData.Value].Num() / 3 : AttributeUint16DataMap[SendData.Value].Num();
+						if (DataSize != ExpectedDataSize)
 						{
-							UE_LOG(LogMultiverseClient, Warning, TEXT("3 * DataSize %d != AttributeUint8DataMap[SendData.Value].Num() %d"), 3 * DataSize, AttributeUint8DataMap[SendData.Value].Num())
+							UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != ExpectedDataSize %d"), 3 * DataSize, ExpectedDataSize)
 						}
 						else
 						{
