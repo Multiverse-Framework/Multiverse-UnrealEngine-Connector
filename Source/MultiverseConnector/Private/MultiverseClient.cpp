@@ -256,30 +256,71 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				break;
 
 			case EAttribute::RGB_3840_2160: case EAttribute::RGB_1280_1024: case EAttribute::RGB_640_480: case EAttribute::RGB_128_128:
+			case EAttribute::Depth_3840_2160: case EAttribute::Depth_1280_1024: case EAttribute::Depth_640_480: case EAttribute::Depth_128_128:
 			{
 				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
 				Object.Key->GetComponents(SceneCaptureComponents);
 				if (SceneCaptureComponents.Num() == 1)
 				{
-					if (Attribute == EAttribute::RGB_3840_2160)
+					if (Attribute == EAttribute::RGB_3840_2160 || Attribute == EAttribute::Depth_3840_2160)
 					{
-						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_3840_2160, Object.Key);
-						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_3840_2160"))));
+						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
+						{
+							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_3840_2160, Object.Key);
+						}
+						if (Attribute == EAttribute::RGB_3840_2160)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_3840_2160"))));
+						}
+						else if (Attribute == EAttribute::Depth_3840_2160)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_3840_2160"))));
+						}
 					}
-					else if (Attribute == EAttribute::RGB_1280_1024)
+					else if (Attribute == EAttribute::RGB_1280_1024 || Attribute == EAttribute::Depth_1280_1024)
 					{
-						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_1280_1024, Object.Key);
-						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_1280_1024"))));
+						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
+						{
+							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_1280_1024, Object.Key);
+						}
+						if (Attribute == EAttribute::RGB_1280_1024)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_1280_1024"))));
+						}
+						else if (Attribute == EAttribute::Depth_1280_1024)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_1280_1024"))));
+						}
 					}
-					else if (Attribute == EAttribute::RGB_640_480)
+					else if (Attribute == EAttribute::RGB_640_480 || Attribute == EAttribute::Depth_640_480)
 					{
-						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_640_480, Object.Key);
-						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_640_480"))));
+						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
+						{
+							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_640_480, Object.Key);
+						}
+						if (Attribute == EAttribute::RGB_640_480)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_640_480"))));
+						}
+						else if (Attribute == EAttribute::Depth_640_480)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_640_480"))));
+						}
 					}
-					else if (Attribute == EAttribute::RGB_128_128)
+					else if (Attribute == EAttribute::RGB_128_128 || Attribute == EAttribute::Depth_128_128)
 					{
-						SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_128_128, Object.Key);
-						AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_128_128"))));
+						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
+						{
+							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_128_128, Object.Key);
+						}
+						if (Attribute == EAttribute::RGB_128_128)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_128_128"))));
+						}
+						else if (Attribute == EAttribute::Depth_128_128)
+						{
+							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_128_128"))));
+						}
 					}
 				}
 				else
@@ -502,9 +543,9 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 
 	printf("ServerSocketAddr: %s\n", server_socket_addr.c_str());
 
-	connect();
-
 	StartTime = FPlatformTime::Seconds();
+
+	connect();
 }
 
 TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FApiCallbacks> &SimulationApiCallbacks)
@@ -1016,6 +1057,7 @@ void FMultiverseClient::bind_send_data()
 	}
 	double *send_buffer_double_addr = send_buffer.buffer_double.data;
 	uint8_t *send_buffer_uint8_addr = send_buffer.buffer_uint8_t.data;
+	uint16_t *send_buffer_uint16_addr = send_buffer.buffer_uint16_t.data;
 
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
 	{
@@ -1049,6 +1091,7 @@ void FMultiverseClient::bind_send_data()
 			}
 
 			case EAttribute::RGB_3840_2160: case EAttribute::RGB_1280_1024: case EAttribute::RGB_640_480: case EAttribute::RGB_128_128:
+			case EAttribute::Depth_3840_2160: case EAttribute::Depth_1280_1024: case EAttribute::Depth_640_480: case EAttribute::Depth_128_128:
 			{
 				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
 				CachedActors[SendData.Key]->GetComponents(SceneCaptureComponents);
@@ -1070,11 +1113,21 @@ void FMultiverseClient::bind_send_data()
 						}
 						else
 						{
-							for (int i = 0; i < DataSize; i++)
+							if (SendData.Value == EAttribute::RGB_3840_2160 || SendData.Value == EAttribute::RGB_1280_1024 || SendData.Value == EAttribute::RGB_640_480 || SendData.Value == EAttribute::RGB_128_128)
 							{
-								*send_buffer_uint8_addr++ = ColorArray[i].R;
-								*send_buffer_uint8_addr++ = ColorArray[i].G;
-								*send_buffer_uint8_addr++ = ColorArray[i].B;
+								for (int i = 0; i < DataSize; i++)
+								{
+									*send_buffer_uint8_addr++ = ColorArray[i].R;
+									*send_buffer_uint8_addr++ = ColorArray[i].G;
+									*send_buffer_uint8_addr++ = ColorArray[i].B;
+								}
+							}
+							else if (SendData.Value == EAttribute::Depth_3840_2160 || SendData.Value == EAttribute::Depth_1280_1024 || SendData.Value == EAttribute::Depth_640_480 || SendData.Value == EAttribute::Depth_128_128)
+							{
+								for (int i = 0; i < DataSize; i++)
+								{
+									*send_buffer_uint16_addr++ = ColorArray[i].A;
+								}
 							}
 						}
 					}
