@@ -85,10 +85,15 @@ const TArray<FString> HandBoneNames =
 		TEXT("Pinky3"),
 		TEXT("PinkyTip")};
 
-UTextureRenderTarget2D *RenderTarget_3840_2160;
-UTextureRenderTarget2D *RenderTarget_1280_1024;
-UTextureRenderTarget2D *RenderTarget_640_480;
-UTextureRenderTarget2D *RenderTarget_128_128;
+UTextureRenderTarget2D *RenderTarget_RGBA8_3840_2160;
+UTextureRenderTarget2D *RenderTarget_RGBA8_1280_1024;
+UTextureRenderTarget2D *RenderTarget_RGBA8_640_480;
+UTextureRenderTarget2D *RenderTarget_RGBA8_128_128;
+
+UTextureRenderTarget2D *RenderTarget_R16_3840_2160;
+UTextureRenderTarget2D *RenderTarget_R16_1280_1024;
+UTextureRenderTarget2D *RenderTarget_R16_640_480;
+UTextureRenderTarget2D *RenderTarget_R16_128_128;
 
 static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 const TPair<AActor *, FAttributeContainer> &Object,
@@ -96,31 +101,118 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 TMap<FString, UActorComponent *> &CachedComponents,
 						 TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
 {
-	if (Object.Key->IsA(ASkeletalMeshActor::StaticClass()))
+	TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+	if (Object.Key != nullptr)
 	{
-		ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key);
-		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
+			const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
 			switch (Attribute)
 			{
 			case EAttribute::Position:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 				break;
 
 			case EAttribute::Quaternion:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 				break;
+
+			case EAttribute::RGB_3840_2160:
+			case EAttribute::RGB_1280_1024:
+			case EAttribute::RGB_640_480:
+			case EAttribute::RGB_128_128:
+			case EAttribute::Depth_3840_2160:
+			case EAttribute::Depth_1280_1024:
+			case EAttribute::Depth_640_480:
+			case EAttribute::Depth_128_128:
+			{
+				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
+				Object.Key->GetComponents(SceneCaptureComponents);
+				for (USceneCaptureComponent2D *SceneCaptureComponent : SceneCaptureComponents)
+				{
+					if (SceneCaptureComponent->TextureTarget != nullptr)
+					{
+						continue;
+					}
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
+					SceneCaptureComponent->ComponentTags.Add(*AttributeName);
+					if (Attribute == EAttribute::RGB_3840_2160 || Attribute == EAttribute::Depth_3840_2160)
+					{
+						if (Attribute == EAttribute::RGB_3840_2160)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_RGBA8_3840_2160, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+						}
+						else if (Attribute == EAttribute::Depth_3840_2160)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_R16_3840_2160, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneDepth;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA16f;
+						}
+					}
+					else if (Attribute == EAttribute::RGB_1280_1024 || Attribute == EAttribute::Depth_1280_1024)
+					{
+						if (Attribute == EAttribute::RGB_1280_1024)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_RGBA8_1280_1024, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+						}
+						else if (Attribute == EAttribute::Depth_1280_1024)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_R16_1280_1024, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneDepth;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA16f;
+						}
+					}
+					else if (Attribute == EAttribute::RGB_640_480 || Attribute == EAttribute::Depth_640_480)
+					{
+						if (Attribute == EAttribute::RGB_640_480)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_RGBA8_640_480, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+						}
+						else if (Attribute == EAttribute::Depth_640_480)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_R16_640_480, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneDepth;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA16f;
+						}
+					}
+					else if (Attribute == EAttribute::RGB_128_128 || Attribute == EAttribute::Depth_128_128)
+					{
+						if (Attribute == EAttribute::RGB_128_128)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_RGBA8_128_128, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+						}
+						else if (Attribute == EAttribute::Depth_128_128)
+						{
+							SceneCaptureComponent->TextureTarget = DuplicateObject(RenderTarget_R16_128_128, Object.Key, *AttributeName);
+							SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_SceneDepth;
+							SceneCaptureComponent->TextureTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA16f;
+						}
+					}
+					break;
+				}
+				break;
+			}
 
 			default:
 				break;
 			}
 		}
-
+	}
+	if (Object.Key->IsA(ASkeletalMeshActor::StaticClass()))
+	{
 		FString ObjectName = Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 
+		ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key);
 		if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
 		{
 			if (UMultiverseAnim *MultiverseAnim = Cast<UMultiverseAnim>(SkeletalMeshComponent->GetAnimInstance()))
@@ -166,17 +258,17 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 		if (CameraComponents.Num() == 1)
 		{
 			CachedComponents.Add(Object.Value.ObjectName, CameraComponents[0]);
-			TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 			for (const EAttribute &Attribute : Object.Value.Attributes)
 			{
+				const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
 				switch (Attribute)
 				{
 				case EAttribute::Position:
-					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 					break;
 
 				case EAttribute::Quaternion:
-					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 					break;
 
 				default:
@@ -188,26 +280,27 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 
 		TArray<USkeletalMeshComponent *> SkeletalMeshComponents;
 		Object.Key->GetComponents(SkeletalMeshComponents, true);
+		TArray<TSharedPtr<FJsonValue>> HandAttributeJsonArray;
 		for (USkeletalMeshComponent *SkeletalMeshComponent : SkeletalMeshComponents)
 		{
 			CachedComponents.Add(SkeletalMeshComponent->GetName(), SkeletalMeshComponent);
-			TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 			for (const EAttribute &Attribute : Object.Value.Attributes)
 			{
+				const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
 				switch (Attribute)
 				{
 				case EAttribute::Position:
-					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+					HandAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 					break;
 
 				case EAttribute::Quaternion:
-					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+					HandAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 					break;
 
 				default:
 					break;
 				}
-				MetaDataJson->SetArrayField(SkeletalMeshComponent->GetName(), AttributeJsonArray);
+				MetaDataJson->SetArrayField(SkeletalMeshComponent->GetName(), HandAttributeJsonArray);
 			}
 		}
 
@@ -218,129 +311,31 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				for (const FString &BoneName : HandBoneNames)
 				{
 					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
-					TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+					TArray<TSharedPtr<FJsonValue>> FingerAttributeJsonArray;
 					for (const EAttribute &Attribute : Object.Value.Attributes)
 					{
+						const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
 						switch (Attribute)
 						{
 						case EAttribute::Position:
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
+							FingerAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 							break;
 
 						case EAttribute::Quaternion:
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
+							FingerAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 							break;
 
 						default:
 							break;
 						}
 					}
-					MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
+					MetaDataJson->SetArrayField(BoneNameStr, FingerAttributeJsonArray);
 				}
 			}
 		}
 	}
 	else if (Object.Key != nullptr)
 	{
-		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-		for (const EAttribute &Attribute : Object.Value.Attributes)
-		{
-			switch (Attribute)
-			{
-			case EAttribute::Position:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("position"))));
-				break;
-
-			case EAttribute::Quaternion:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("quaternion"))));
-				break;
-
-			case EAttribute::RGB_3840_2160:
-			case EAttribute::RGB_1280_1024:
-			case EAttribute::RGB_640_480:
-			case EAttribute::RGB_128_128:
-			case EAttribute::Depth_3840_2160:
-			case EAttribute::Depth_1280_1024:
-			case EAttribute::Depth_640_480:
-			case EAttribute::Depth_128_128:
-			{
-				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
-				Object.Key->GetComponents(SceneCaptureComponents);
-				if (SceneCaptureComponents.Num() == 1)
-				{
-					if (Attribute == EAttribute::RGB_3840_2160 || Attribute == EAttribute::Depth_3840_2160)
-					{
-						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
-						{
-							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_3840_2160, Object.Key);
-						}
-						if (Attribute == EAttribute::RGB_3840_2160)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_3840_2160"))));
-						}
-						else if (Attribute == EAttribute::Depth_3840_2160)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_3840_2160"))));
-						}
-					}
-					else if (Attribute == EAttribute::RGB_1280_1024 || Attribute == EAttribute::Depth_1280_1024)
-					{
-						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
-						{
-							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_1280_1024, Object.Key);
-						}
-						if (Attribute == EAttribute::RGB_1280_1024)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_1280_1024"))));
-						}
-						else if (Attribute == EAttribute::Depth_1280_1024)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_1280_1024"))));
-						}
-					}
-					else if (Attribute == EAttribute::RGB_640_480 || Attribute == EAttribute::Depth_640_480)
-					{
-						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
-						{
-							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_640_480, Object.Key);
-						}
-						if (Attribute == EAttribute::RGB_640_480)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_640_480"))));
-						}
-						else if (Attribute == EAttribute::Depth_640_480)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_640_480"))));
-						}
-					}
-					else if (Attribute == EAttribute::RGB_128_128 || Attribute == EAttribute::Depth_128_128)
-					{
-						if (SceneCaptureComponents[0]->TextureTarget == nullptr)
-						{
-							SceneCaptureComponents[0]->TextureTarget = DuplicateObject(RenderTarget_128_128, Object.Key);
-						}
-						if (Attribute == EAttribute::RGB_128_128)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("rgb_128_128"))));
-						}
-						else if (Attribute == EAttribute::Depth_128_128)
-						{
-							AttributeJsonArray.Add(MakeShareable(new FJsonValueString(TEXT("depth_128_128"))));
-						}
-					}
-				}
-				else
-				{
-					UE_LOG(LogMultiverseClient, Error, TEXT("SceneCaptureComponents.Num() of %s = %d"), *Object.Value.ObjectName, SceneCaptureComponents.Num())
-				}
-				break;
-			}
-
-			default:
-				break;
-			}
-		}
-
 		FString ObjectName = Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
@@ -352,14 +347,21 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 {
 	if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
 	{
-		if (Object.Value.Attributes.Contains(EAttribute::Position))
+		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Position));
-		}
-
-		if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
-		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Quaternion));
+			if (Attribute == EAttribute::Position ||
+				Attribute == EAttribute::Quaternion ||
+				Attribute == EAttribute::RGB_3840_2160 ||
+				Attribute == EAttribute::RGB_1280_1024 ||
+				Attribute == EAttribute::RGB_640_480 ||
+				Attribute == EAttribute::RGB_128_128 ||
+				Attribute == EAttribute::Depth_3840_2160 ||
+				Attribute == EAttribute::Depth_1280_1024 ||
+				Attribute == EAttribute::Depth_640_480 ||
+				Attribute == EAttribute::Depth_128_128)
+			{
+				DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
+			}
 		}
 
 		if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
@@ -416,7 +418,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		}
 		else
 		{
-			UE_LOG(LogMultiverseClient, Error, TEXT("CameraComponents.Num() of %s = %d"), *Object.Value.ObjectName, CameraComponents.Num())
+			UE_LOG(LogMultiverseClient, Warning, TEXT("CameraComponents.Num() of %s = %d"), *Object.Value.ObjectName, CameraComponents.Num())
 		}
 
 		TArray<USkeletalMeshComponent *> SkeletalMeshComponents;
@@ -457,7 +459,6 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 	}
 	else if (Object.Key != nullptr)
 	{
-		TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
 			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
@@ -488,44 +489,84 @@ FMultiverseClient::FMultiverseClient()
 		{FLinearColor(0.8, 0.1, 0, 1), TEXT("Orange")},
 		{FLinearColor(0.1, 0.1, 0.1, 1), TEXT("Gray")}};
 
-	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_3840_2160(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_3840_2160.RT_3840_2160'"));
-	if (RenderTargetAsset_3840_2160.Succeeded())
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_RGBA8_3840_2160(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_RGBA8_3840_2160.RT_RGBA8_3840_2160'"));
+	if (RenderTargetAsset_RGBA8_3840_2160.Succeeded())
 	{
-		RenderTarget_3840_2160 = RenderTargetAsset_3840_2160.Object;
+		RenderTarget_RGBA8_3840_2160 = RenderTargetAsset_RGBA8_3840_2160.Object;
 	}
 	else
 	{
-		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_3840_2160"))
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_RGBA8_3840_2160"))
 	}
 
-	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_1280_1024(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_1280_1024.RT_1280_1024'"));
-	if (RenderTargetAsset_1280_1024.Succeeded())
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_RGBA8_1280_1024(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_RGBA8_1280_1024.RT_RGBA8_1280_1024'"));
+	if (RenderTargetAsset_RGBA8_1280_1024.Succeeded())
 	{
-		RenderTarget_1280_1024 = RenderTargetAsset_1280_1024.Object;
+		RenderTarget_RGBA8_1280_1024 = RenderTargetAsset_RGBA8_1280_1024.Object;
 	}
 	else
 	{
-		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_1280_1024"))
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_RGBA8_1280_1024"))
 	}
 
-	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_640_480(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_640_480.RT_640_480'"));
-	if (RenderTargetAsset_640_480.Succeeded())
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_RGBA8_640_480(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_RGBA8_640_480.RT_RGBA8_640_480'"));
+	if (RenderTargetAsset_RGBA8_640_480.Succeeded())
 	{
-		RenderTarget_640_480 = RenderTargetAsset_640_480.Object;
+		RenderTarget_RGBA8_640_480 = RenderTargetAsset_RGBA8_640_480.Object;
 	}
 	else
 	{
-		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_640_480"))
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_RGBA8_640_480"))
 	}
 
-	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_128_128(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_128_128.RT_128_128'"));
-	if (RenderTargetAsset_128_128.Succeeded())
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_RGBA8_128_128(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_RGBA8_128_128.RT_RGBA8_128_128'"));
+	if (RenderTargetAsset_RGBA8_128_128.Succeeded())
 	{
-		RenderTarget_128_128 = RenderTargetAsset_128_128.Object;
+		RenderTarget_RGBA8_128_128 = RenderTargetAsset_RGBA8_128_128.Object;
 	}
 	else
 	{
-		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_128_128"))
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_RGBA8_128_128"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_R16_3840_2160(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_RGBA8_3840_2160.RT_RGBA8_3840_2160'"));
+	if (RenderTargetAsset_R16_3840_2160.Succeeded())
+	{
+		RenderTarget_RGBA8_3840_2160 = RenderTargetAsset_R16_3840_2160.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_RGBA8_3840_2160"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_R16_1280_1024(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_R16_1280_1024.RT_R16_1280_1024'"));
+	if (RenderTargetAsset_R16_1280_1024.Succeeded())
+	{
+		RenderTarget_R16_1280_1024 = RenderTargetAsset_R16_1280_1024.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_R16_1280_1024"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_R16_640_480(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_R16_640_480.RT_R16_640_480'"));
+	if (RenderTargetAsset_R16_640_480.Succeeded())
+	{
+		RenderTarget_R16_640_480 = RenderTargetAsset_R16_640_480.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_R16_640_480"))
+	}
+
+	ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> RenderTargetAsset_R16_128_128(TEXT("/Script/Engine.TextureRenderTarget2D'/MultiverseConnector/Rendering/RT_R16_128_128.RT_R16_128_128'"));
+	if (RenderTargetAsset_R16_128_128.Succeeded())
+	{
+		RenderTarget_R16_128_128 = RenderTargetAsset_R16_128_128.Object;
+	}
+	else
+	{
+		UE_LOG(LogMultiverseClient, Error, TEXT("Failed to find RT_R16_128_128"))
 	}
 }
 
@@ -909,6 +950,7 @@ void FMultiverseClient::bind_response_meta_data()
 
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
 	{
+		const FString AttributeName = *AttributeStringMap.FindKey(SendData.Value);
 		if (CachedActors.Contains(SendData.Key))
 		{
 			if (CachedActors[SendData.Key] == nullptr)
@@ -921,12 +963,12 @@ void FMultiverseClient::bind_response_meta_data()
 			{
 			case EAttribute::Position:
 			{
-				if (!ResponseSendObjects->HasField("position"))
+				if (!ResponseSendObjects->HasField(AttributeName))
 				{
 					continue;
 				}
 
-				TArray<TSharedPtr<FJsonValue>> ObjectPosition = ResponseSendObjects->GetArrayField(TEXT("position"));
+				TArray<TSharedPtr<FJsonValue>> ObjectPosition = ResponseSendObjects->GetArrayField(AttributeName);
 				if (ObjectPosition.Num() != 3)
 				{
 					continue;
@@ -941,12 +983,12 @@ void FMultiverseClient::bind_response_meta_data()
 
 			case EAttribute::Quaternion:
 			{
-				if (!ResponseSendObjects->HasField(TEXT("quaternion")))
+				if (!ResponseSendObjects->HasField(AttributeName))
 				{
 					continue;
 				}
 
-				TArray<TSharedPtr<FJsonValue>> ObjectQuaternion = ResponseSendObjects->GetArrayField(TEXT("quaternion"));
+				TArray<TSharedPtr<FJsonValue>> ObjectQuaternion = ResponseSendObjects->GetArrayField(AttributeName);
 				if (ObjectQuaternion.Num() != 4)
 				{
 					continue;
@@ -970,12 +1012,12 @@ void FMultiverseClient::bind_response_meta_data()
 			{
 			case EAttribute::JointRvalue:
 			{
-				if (!ResponseSendObjects->HasField(TEXT("joint_rvalue")))
+				if (!ResponseSendObjects->HasField(AttributeName))
 				{
 					continue;
 				}
 
-				TArray<TSharedPtr<FJsonValue>> JointRvalue = ResponseSendObjects->GetArrayField(TEXT("joint_rvalue"));
+				TArray<TSharedPtr<FJsonValue>> JointRvalue = ResponseSendObjects->GetArrayField(AttributeName);
 				if (JointRvalue.Num() != 1)
 				{
 					continue;
@@ -986,12 +1028,12 @@ void FMultiverseClient::bind_response_meta_data()
 
 			case EAttribute::JointTvalue:
 			{
-				if (!ResponseSendObjects->HasField(TEXT("joint_tvalue")))
+				if (!ResponseSendObjects->HasField(AttributeName))
 				{
 					continue;
 				}
 
-				TArray<TSharedPtr<FJsonValue>> JointTvalue = ResponseSendObjects->GetArrayField(TEXT("joint_tvalue"));
+				TArray<TSharedPtr<FJsonValue>> JointTvalue = ResponseSendObjects->GetArrayField(AttributeName);
 				if (JointTvalue.Num() != 1)
 				{
 					continue;
@@ -1130,51 +1172,44 @@ void FMultiverseClient::bind_send_data()
 			{
 				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
 				CachedActors[SendData.Key]->GetComponents(SceneCaptureComponents);
-				if (SceneCaptureComponents.Num() == 1)
+				const FString AttributeName = *AttributeStringMap.FindKey(SendData.Value);
+				for (USceneCaptureComponent2D *SceneCaptureComponent : SceneCaptureComponents)
 				{
-					USceneCaptureComponent2D *SceneCaptureComponent = SceneCaptureComponents[0];
-					if (SceneCaptureComponent->TextureTarget != nullptr)
+					if (!SceneCaptureComponent->ComponentTags.Contains(*AttributeName) || SceneCaptureComponent->TextureTarget == nullptr)
 					{
-						FTextureRenderTargetResource *TextureRenderTargetResource = SceneCaptureComponent->TextureTarget->GameThread_GetRenderTargetResource();
-						TArray<FColor> ColorArray;
-						FReadSurfaceDataFlags ReadSurfaceDataFlags;
-						ReadSurfaceDataFlags.SetLinearToGamma(false);
-						TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
+						continue;
+					}
+					FTextureRenderTargetResource *TextureRenderTargetResource = SceneCaptureComponent->TextureTarget->GameThread_GetRenderTargetResource();
+					TArray<FColor> ColorArray;
+					FReadSurfaceDataFlags ReadSurfaceDataFlags;
+					ReadSurfaceDataFlags.SetLinearToGamma(false);
+					TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
 
-						const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
-						const int ExpectedDataSize = AttributeUint8DataMap.Contains(SendData.Value) ? AttributeUint8DataMap[SendData.Value].Num() / 3 : AttributeUint16DataMap[SendData.Value].Num();
-						if (DataSize != ExpectedDataSize)
-						{
-							UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != ExpectedDataSize %d"), 3 * DataSize, ExpectedDataSize)
-						}
-						else
-						{
-							if (SendData.Value == EAttribute::RGB_3840_2160 || SendData.Value == EAttribute::RGB_1280_1024 || SendData.Value == EAttribute::RGB_640_480 || SendData.Value == EAttribute::RGB_128_128)
-							{
-								for (int i = 0; i < DataSize; i++)
-								{
-									*send_buffer_uint8_addr++ = ColorArray[i].R;
-									*send_buffer_uint8_addr++ = ColorArray[i].G;
-									*send_buffer_uint8_addr++ = ColorArray[i].B;
-								}
-							}
-							else if (SendData.Value == EAttribute::Depth_3840_2160 || SendData.Value == EAttribute::Depth_1280_1024 || SendData.Value == EAttribute::Depth_640_480 || SendData.Value == EAttribute::Depth_128_128)
-							{
-								for (int i = 0; i < DataSize; i++)
-								{
-									*send_buffer_uint16_addr++ = ColorArray[i].A;
-								}
-							}
-						}
+					const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
+					const int ExpectedDataSize = AttributeUint8DataMap.Contains(SendData.Value) ? AttributeUint8DataMap[SendData.Value].Num() / 3 : AttributeUint16DataMap[SendData.Value].Num();
+					if (DataSize != ExpectedDataSize)
+					{
+						UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != ExpectedDataSize %d"), 3 * DataSize, ExpectedDataSize)
 					}
 					else
 					{
-						UE_LOG(LogMultiverseClient, Warning, TEXT("TextureTarget is nullptr"))
+						if (SendData.Value == EAttribute::RGB_3840_2160 || SendData.Value == EAttribute::RGB_1280_1024 || SendData.Value == EAttribute::RGB_640_480 || SendData.Value == EAttribute::RGB_128_128)
+						{
+							for (int i = 0; i < DataSize; i++)
+							{
+								*send_buffer_uint8_addr++ = ColorArray[i].R;
+								*send_buffer_uint8_addr++ = ColorArray[i].G;
+								*send_buffer_uint8_addr++ = ColorArray[i].B;
+							}
+						}
+						else if (SendData.Value == EAttribute::Depth_3840_2160 || SendData.Value == EAttribute::Depth_1280_1024 || SendData.Value == EAttribute::Depth_640_480 || SendData.Value == EAttribute::Depth_128_128)
+						{
+							for (int i = 0; i < DataSize; i++)
+							{
+								*send_buffer_uint16_addr++ = ColorArray[i].R;
+							}
+						}
 					}
-				}
-				else
-				{
-					UE_LOG(LogMultiverseClient, Warning, TEXT("SceneCaptureComponents.Num() = %d"), SceneCaptureComponents.Num())
 				}
 				break;
 			}
