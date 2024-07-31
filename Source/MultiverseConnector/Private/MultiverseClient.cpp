@@ -253,57 +253,6 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	}
 	else if (Object.Key->IsA(APawn::StaticClass()))
 	{
-		TArray<UCameraComponent *> CameraComponents;
-		Object.Key->GetComponents(CameraComponents);
-		if (CameraComponents.Num() == 1)
-		{
-			CachedComponents.Add(Object.Value.ObjectName, CameraComponents[0]);
-			for (const EAttribute &Attribute : Object.Value.Attributes)
-			{
-				const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
-				switch (Attribute)
-				{
-				case EAttribute::Position:
-					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-					break;
-
-				case EAttribute::Quaternion:
-					AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-					break;
-
-				default:
-					break;
-				}
-			}
-			MetaDataJson->SetArrayField(Object.Value.ObjectName, AttributeJsonArray);
-		}
-
-		TArray<USkeletalMeshComponent *> SkeletalMeshComponents;
-		Object.Key->GetComponents(SkeletalMeshComponents, true);
-		TArray<TSharedPtr<FJsonValue>> HandAttributeJsonArray;
-		for (USkeletalMeshComponent *SkeletalMeshComponent : SkeletalMeshComponents)
-		{
-			CachedComponents.Add(SkeletalMeshComponent->GetName(), SkeletalMeshComponent);
-			for (const EAttribute &Attribute : Object.Value.Attributes)
-			{
-				const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
-				switch (Attribute)
-				{
-				case EAttribute::Position:
-					HandAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-					break;
-
-				case EAttribute::Quaternion:
-					HandAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-					break;
-
-				default:
-					break;
-				}
-				MetaDataJson->SetArrayField(SkeletalMeshComponent->GetName(), HandAttributeJsonArray);
-			}
-		}
-
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
 			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
@@ -333,6 +282,9 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				}
 			}
 		}
+		FString ObjectName = Object.Value.ObjectName;
+		CachedActors.Add(ObjectName, Object.Key);
+		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 	}
 	else if (Object.Key != nullptr)
 	{
@@ -1287,7 +1239,10 @@ void FMultiverseClient::bind_send_data()
 			}
 			else
 			{
-				UE_LOG(LogMultiverseClient, Error, TEXT("CachedComponents does not contain %s"), *SendData.Key)
+				if (!SendData.Key.Contains(TEXT("LeftHand")) && !SendData.Key.Contains(TEXT("RightHand")))
+				{
+					UE_LOG(LogMultiverseClient, Error, TEXT("CachedComponents does not contain %s"), *SendData.Key)
+				}
 			}
 			APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
 			for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
