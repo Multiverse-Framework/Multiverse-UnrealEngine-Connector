@@ -14,6 +14,7 @@
 #include "Camera/CameraComponent.h"
 #ifdef WIN32
 #include "OculusXRHandComponent.h"
+#include "UObject/Class.h"
 #endif
 #include "Kismet/GameplayStatics.h"
 #include <chrono>
@@ -59,33 +60,6 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("depth_1280_1024"), EAttribute::Depth_1280_1024},
 		{TEXT("depth_640_480"), EAttribute::Depth_640_480},
 		{TEXT("depth_128_128"), EAttribute::Depth_128_128}};
-
-const TArray<FString> HandBoneNames =
-	{
-		TEXT("WristRoot"),
-		TEXT("ForearmStub"),
-		TEXT("Thumb0"),
-		TEXT("Thumb1"),
-		TEXT("Thumb2"),
-		TEXT("Thumb3"),
-		TEXT("ThumbTip"),
-		TEXT("Index1"),
-		TEXT("Index2"),
-		TEXT("Index3"),
-		TEXT("IndexTip"),
-		TEXT("Middle1"),
-		TEXT("Middle2"),
-		TEXT("Middle3"),
-		TEXT("MiddleTip"),
-		TEXT("Ring1"),
-		TEXT("Ring2"),
-		TEXT("Ring3"),
-		TEXT("RingTip"),
-		TEXT("Pinky0"),
-		TEXT("Pinky1"),
-		TEXT("Pinky2"),
-		TEXT("Pinky3"),
-		TEXT("PinkyTip")};
 
 UTextureRenderTarget2D *RenderTarget_RGBA8_3840_2160;
 UTextureRenderTarget2D *RenderTarget_RGBA8_1280_1024;
@@ -258,31 +232,41 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 #ifdef WIN32
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
-			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+			TArray<UActorComponent *> ActorComponents = Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag);
+			if (ActorComponents.Num() == 0)
 			{
-				for (const FString &BoneName : HandBoneNames)
+				UE_LOG(LogMultiverseClient, Warning, TEXT("%s not found"), *Tag)
+				continue;
+			}
+			else if (ActorComponents.Num() > 1)
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s, ignore all"), ActorComponents.Num(), *Tag)
+				continue;
+			}
+
+			for (TPair<EOculusXRBone, FName> &BoneNameMapping : Cast<UOculusXRHandComponent>(ActorComponents[0])->BoneNameMappings)
+			{
+				const FString BoneNameStr = Tag + TEXT("_") + UEnum::GetDisplayValueAsText(BoneNameMapping.Key).ToString().Replace(TEXT(" "), TEXT(""));
+				BoneNameMapping.Value = *BoneNameStr;
+				TArray<TSharedPtr<FJsonValue>> FingerAttributeJsonArray;
+				for (const EAttribute &Attribute : Object.Value.Attributes)
 				{
-					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
-					TArray<TSharedPtr<FJsonValue>> FingerAttributeJsonArray;
-					for (const EAttribute &Attribute : Object.Value.Attributes)
+					const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
+					switch (Attribute)
 					{
-						const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
-						switch (Attribute)
-						{
-						case EAttribute::Position:
-							FingerAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-							break;
+					case EAttribute::Position:
+						FingerAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
+						break;
 
-						case EAttribute::Quaternion:
-							FingerAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-							break;
+					case EAttribute::Quaternion:
+						FingerAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
+						break;
 
-						default:
-							break;
-						}
+					default:
+						break;
 					}
-					MetaDataJson->SetArrayField(BoneNameStr, FingerAttributeJsonArray);
 				}
+				MetaDataJson->SetArrayField(BoneNameStr, FingerAttributeJsonArray);
 			}
 		}
 		FString ObjectName = Object.Value.ObjectName;
@@ -394,19 +378,27 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 #ifdef WIN32
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
-			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+			TArray<UActorComponent *> ActorComponents = Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag);
+			if (ActorComponents.Num() == 0)
 			{
-				for (const FString &BoneName : HandBoneNames)
+				UE_LOG(LogMultiverseClient, Warning, TEXT("%s not found"), *Tag)
+				continue;
+			}
+			else if (ActorComponents.Num() > 1)
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s, ignore all"), ActorComponents.Num(), *Tag)
+				continue;
+			}
+
+			for (const TPair<EOculusXRBone, FName> &BoneNameMapping : Cast<UOculusXRHandComponent>(ActorComponents[0])->BoneNameMappings)
+			{
+				if (Object.Value.Attributes.Contains(EAttribute::Position))
 				{
-					const FString BoneNameStr = Tag + TEXT("_") + BoneName;
-					if (Object.Value.Attributes.Contains(EAttribute::Position))
-					{
-						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Position));
-					}
-					if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
-					{
-						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Quaternion));
-					}
+					DataArray.Add(TPair<FString, EAttribute>(BoneNameMapping.Value.ToString(), EAttribute::Position));
+				}
+				if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
+				{
+					DataArray.Add(TPair<FString, EAttribute>(BoneNameMapping.Value.ToString(), EAttribute::Quaternion));
 				}
 			}
 		}
@@ -1257,32 +1249,36 @@ void FMultiverseClient::bind_send_data()
 			{
 				if (SendData.Key.Contains(Tag))
 				{
-					const FString BoneName = SendData.Key.RightChop(Tag.Len() + 1).Replace(TEXT("WristRoot"), TEXT("Wrist Root")).Replace(TEXT("ForearmStub"), TEXT("Forearm Stub")).Replace(TEXT("Tip"), TEXT(" Tip"));
-					for (UActorComponent *HandComponent : PlayerPawn->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
+					TArray<UActorComponent *> ActorComponents = PlayerPawn->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag);
+					if (ActorComponents.Num() != 1)
 					{
-						UOculusXRHandComponent *OculusXRHandComponent = Cast<UOculusXRHandComponent>(HandComponent);
-						if (OculusXRHandComponent == nullptr)
-						{
-							UE_LOG(LogMultiverseClient, Error, TEXT("%s is not OculusXRHandComponent"), *Tag)
-							continue;
-						}
-
-						if (SendData.Value == EAttribute::Position)
-						{
-							const FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
-							*send_buffer_double_addr++ = BoneLocation.X;
-							*send_buffer_double_addr++ = BoneLocation.Y;
-							*send_buffer_double_addr++ = BoneLocation.Z;
-						}
-						else if (SendData.Value == EAttribute::Quaternion)
-						{
-							const FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
-							const FQuat BoneQuat = BoneRotator.Quaternion();
-							*send_buffer_double_addr++ = BoneQuat.W;
-							*send_buffer_double_addr++ = BoneQuat.X;
-							*send_buffer_double_addr++ = BoneQuat.Y;
-							*send_buffer_double_addr++ = BoneQuat.Z;
-						}
+						UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s"), ActorComponents.Num(), *Tag)
+						continue;
+					}
+					UOculusXRHandComponent *OculusXRHandComponent = Cast<UOculusXRHandComponent>(ActorComponents[0]);
+					
+					const EOculusXRBone *Bone = OculusXRHandComponent->BoneNameMappings.FindKey(*SendData.Key);
+					if (Bone == nullptr)
+					{
+						UE_LOG(LogMultiverseClient, Warning, TEXT("Bone %s is nullptr"), *SendData.Key)
+						continue;
+					}
+					const FString BoneName = UEnum::GetDisplayValueAsText(*Bone).ToString();
+					if (SendData.Value == EAttribute::Position)
+					{
+						const FVector BoneLocation = OculusXRHandComponent->GetBoneLocationByName(*BoneName, EBoneSpaces::WorldSpace);
+						*send_buffer_double_addr++ = BoneLocation.X;
+						*send_buffer_double_addr++ = BoneLocation.Y;
+						*send_buffer_double_addr++ = BoneLocation.Z;
+					}
+					else if (SendData.Value == EAttribute::Quaternion)
+					{
+						const FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
+						const FQuat BoneQuat = BoneRotator.Quaternion();
+						*send_buffer_double_addr++ = BoneQuat.W;
+						*send_buffer_double_addr++ = BoneQuat.X;
+						*send_buffer_double_addr++ = BoneQuat.Y;
+						*send_buffer_double_addr++ = BoneQuat.Z;
 					}
 				}
 			}
