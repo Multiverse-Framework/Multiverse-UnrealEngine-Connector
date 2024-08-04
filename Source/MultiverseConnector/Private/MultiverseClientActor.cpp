@@ -48,32 +48,35 @@ void AMultiverseClientActor::Init() const
 		return;
 	}
 
-#if WITH_EDITOR
-	for (AActor *Actor : World->GetCurrentLevel()->Actors)
+	if (MultiverseClientComponent && MultiverseClientComponent->UpdateRate > 0.0f)
 	{
-		if (Actor && Actor->Tags.Contains((FName("receive_position"))))
+#if WITH_EDITOR
+		for (AActor *Actor : World->GetCurrentLevel()->Actors)
 		{
-			FAttributeContainer AttributeContainer;
-			AttributeContainer.ObjectName = Actor->GetActorLabel();
-			AttributeContainer.Attributes.Add(EAttribute::Position);
-			MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
+			if (Actor && Actor->Tags.Contains((FName("receive_position"))))
+			{
+				FAttributeContainer AttributeContainer;
+				AttributeContainer.ObjectName = Actor->GetActorLabel();
+				AttributeContainer.Attributes.Add(EAttribute::Position);
+				MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
+			}
+			if (Actor && Actor->Tags.Contains((FName("receive_quaternion"))))
+			{
+				FAttributeContainer AttributeContainer;
+				AttributeContainer.ObjectName = Actor->GetActorLabel();
+				AttributeContainer.Attributes.Add(EAttribute::Quaternion);
+				MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
+			}
 		}
-		if (Actor && Actor->Tags.Contains((FName("receive_quaternion"))))
-		{
-			FAttributeContainer AttributeContainer;
-			AttributeContainer.ObjectName = Actor->GetActorLabel();
-			AttributeContainer.Attributes.Add(EAttribute::Quaternion);
-			MultiverseClientComponent->ReceiveObjects.Add(Actor, AttributeContainer);
-		}
-	}
 #endif
 
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
-	FAttributeContainer AttributeContainer;
-	AttributeContainer.ObjectName = TEXT("PlayerPawn");
-	AttributeContainer.Attributes.Add(EAttribute::Position);
-	AttributeContainer.Attributes.Add(EAttribute::Quaternion);
-	MultiverseClientComponent->SendObjects.Add(PlayerPawn, AttributeContainer);
+		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+		FAttributeContainer AttributeContainer;
+		AttributeContainer.ObjectName = TEXT("PlayerPawn");
+		AttributeContainer.Attributes.Add(EAttribute::Position);
+		AttributeContainer.Attributes.Add(EAttribute::Quaternion);
+		MultiverseClientComponent->SendObjects.Add(PlayerPawn, AttributeContainer);
+	}
 
 	MultiverseClientComponent->Init();
 }

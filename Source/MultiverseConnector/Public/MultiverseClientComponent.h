@@ -26,6 +26,9 @@ public:
 
 	void Tick(float DeltaTime);
 
+	UFUNCTION(BlueprintCallable)
+	void CallApis();
+
 	void Deinit();
 
 public:
@@ -47,10 +50,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float UpdateRate = 1.0f;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<AActor*, FAttributeContainer> SendObjects;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<AActor*, FAttributeContainer> ReceiveObjects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "API Callbacks")

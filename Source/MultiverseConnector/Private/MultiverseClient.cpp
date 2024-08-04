@@ -269,6 +269,47 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 				MetaDataJson->SetArrayField(BoneNameStr, FingerAttributeJsonArray);
 			}
 		}
+
+		for (const FString &Tag : {TEXT("LeftController"), TEXT("RightController")})
+		{
+			TArray<UActorComponent *> ActorComponents = Object.Key->GetComponentsByTag(USkeletalMeshComponent::StaticClass(), *Tag);
+			if (ActorComponents.Num() == 0)
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("%s not found"), *Tag)
+				continue;
+			}
+			else if (ActorComponents.Num() > 1)
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s, ignore all"), ActorComponents.Num(), *Tag)
+				continue;
+			}
+
+			TArray<FName> BoneNames;
+			Cast<USkeletalMeshComponent>(ActorComponents[0])->GetBoneNames(BoneNames);
+			for (const FName &BoneName : BoneNames)
+			{
+				TArray<TSharedPtr<FJsonValue>> BoneAttributeJsonArray;
+				for (const EAttribute &Attribute : Object.Value.Attributes)
+				{
+					const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
+					switch (Attribute)
+					{
+					case EAttribute::Position:
+						BoneAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
+						break;
+
+					case EAttribute::Quaternion:
+						BoneAttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
+						break;
+
+					default:
+						break;
+					}
+				}
+				const FString BoneNameStr = Tag + TEXT("_") + BoneName.ToString();
+				MetaDataJson->SetArrayField(BoneNameStr, BoneAttributeJsonArray);
+			}
+		}
 		FString ObjectName = Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
@@ -361,20 +402,6 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			UE_LOG(LogMultiverseClient, Warning, TEXT("CameraComponents.Num() of %s = %d"), *Object.Value.ObjectName, CameraComponents.Num())
 		}
 
-		TArray<USkeletalMeshComponent *> SkeletalMeshComponents;
-		Object.Key->GetComponents(SkeletalMeshComponents, true);
-		for (USkeletalMeshComponent *SkeletalMeshComponent : SkeletalMeshComponents)
-		{
-			if (Object.Value.Attributes.Contains(EAttribute::Position))
-			{
-				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Position));
-			}
-			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
-			{
-				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Quaternion));
-			}
-		}
-
 #ifdef WIN32
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
@@ -399,6 +426,37 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 				{
 					DataArray.Add(TPair<FString, EAttribute>(BoneNameMapping.Value.ToString(), EAttribute::Quaternion));
+				}
+			}
+		}
+
+		for (const FString &Tag : {TEXT("LeftController"), TEXT("RightController")})
+		{
+			TArray<UActorComponent *> ActorComponents = Object.Key->GetComponentsByTag(USkeletalMeshComponent::StaticClass(), *Tag);
+			if (ActorComponents.Num() == 0)
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("%s not found"), *Tag)
+				continue;
+			}
+			else if (ActorComponents.Num() > 1)
+			{
+				UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s, ignore all"), ActorComponents.Num(), *Tag)
+				continue;
+			}
+
+			TArray<FName> BoneNames;
+			Cast<USkeletalMeshComponent>(ActorComponents[0])->GetBoneNames(BoneNames);
+
+			for (const FName &BoneName : BoneNames)
+			{
+				const FString BoneNameStr = Tag + TEXT("_") + BoneName.ToString();
+				if (Object.Value.Attributes.Contains(EAttribute::Position))
+				{
+					DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Position));
+				}
+				if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
+				{
+					DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::Quaternion));
 				}
 			}
 		}
@@ -1237,7 +1295,7 @@ void FMultiverseClient::bind_send_data()
 			}
 			else
 			{
-				if (!SendData.Key.Contains(TEXT("LeftHand")) && !SendData.Key.Contains(TEXT("RightHand")))
+				if (!SendData.Key.Contains(TEXT("LeftHand")) && !SendData.Key.Contains(TEXT("RightHand")) && !SendData.Key.Contains(TEXT("LeftController")) && !SendData.Key.Contains(TEXT("RightController")))
 				{
 					UE_LOG(LogMultiverseClient, Error, TEXT("CachedComponents does not contain %s"), *SendData.Key)
 				}
@@ -1247,7 +1305,7 @@ void FMultiverseClient::bind_send_data()
 			APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
 			for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 			{
-				if (SendData.Key.Contains(Tag))
+				if (SendData.Key.StartsWith(Tag))
 				{
 					TArray<UActorComponent *> ActorComponents = PlayerPawn->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag);
 					if (ActorComponents.Num() != 1)
@@ -1275,6 +1333,43 @@ void FMultiverseClient::bind_send_data()
 					{
 						const FRotator BoneRotator = OculusXRHandComponent->GetBoneRotationByName(*BoneName, EBoneSpaces::WorldSpace);
 						const FQuat BoneQuat = BoneRotator.Quaternion();
+						*send_buffer_double_addr++ = BoneQuat.W;
+						*send_buffer_double_addr++ = BoneQuat.X;
+						*send_buffer_double_addr++ = BoneQuat.Y;
+						*send_buffer_double_addr++ = BoneQuat.Z;
+					}
+				}
+			}
+
+			for (const FString &Tag : {TEXT("LeftController"), TEXT("RightController")})
+			{
+				if (SendData.Key.StartsWith(Tag))
+				{
+					TArray<UActorComponent *> ActorComponents = PlayerPawn->GetComponentsByTag(USkeletalMeshComponent::StaticClass(), *Tag);
+					if (ActorComponents.Num() != 1)
+					{
+						UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s"), ActorComponents.Num(), *Tag)
+						continue;
+					}
+
+					USkeletalMeshComponent *SkeletalMeshComponent = Cast<USkeletalMeshComponent>(ActorComponents[0]);
+					const FString BoneNameStr = SendData.Key.RightChop(Tag.Len() + 1);
+					if (!SkeletalMeshComponent->DoesSocketExist(*BoneNameStr))
+					{
+						UE_LOG(LogMultiverseClient, Warning, TEXT("Bone %s does not exist"), *BoneNameStr)
+						continue;
+					}
+					
+					if (SendData.Value == EAttribute::Position)
+					{
+						const FVector BoneLocation = SkeletalMeshComponent->GetSocketLocation(*BoneNameStr);
+						*send_buffer_double_addr++ = BoneLocation.X;
+						*send_buffer_double_addr++ = BoneLocation.Y;
+						*send_buffer_double_addr++ = BoneLocation.Z;
+					}
+					else if (SendData.Value == EAttribute::Quaternion)
+					{
+						const FQuat BoneQuat = SkeletalMeshComponent->GetSocketRotation(*BoneNameStr).Quaternion();
 						*send_buffer_double_addr++ = BoneQuat.W;
 						*send_buffer_double_addr++ = BoneQuat.X;
 						*send_buffer_double_addr++ = BoneQuat.Y;
