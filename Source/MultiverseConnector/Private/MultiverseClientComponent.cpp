@@ -3,7 +3,7 @@
 #include "MultiverseClientComponent.h"
 
 #include "MultiverseClient.h"
-#include "HAL/PlatformFilemanager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Misc/FileHelper.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClientComponent, Log, All);

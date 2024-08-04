@@ -14,7 +14,8 @@ public class MultiverseConnector : ModuleRules
 
     PublicDependencyModuleNames.AddRange(
       new string[]
-      { "Core",
+      {
+        "Core",
         "CoreUObject",
         "Engine",
         "Projects",
@@ -26,11 +27,14 @@ public class MultiverseConnector : ModuleRules
       }
       );
 
-    PrivateDependencyModuleNames.AddRange(
-      new string[] 
-      {
-        "OculusXRInput"
-      });
+    if (Target.Platform == UnrealTargetPlatform.Win64)
+    {
+      PrivateDependencyModuleNames.AddRange(
+        new string[]
+        {
+          "OculusXRInput"
+        });
+    }
 
     // Uncomment if you are using Slate UI
     // PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

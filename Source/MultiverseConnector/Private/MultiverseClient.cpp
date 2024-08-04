@@ -9,10 +9,12 @@
 #include "MultiverseAnim.h"
 #include "MultiverseClient.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
-#include "SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Camera/CameraComponent.h"
+#ifdef WIN32
 #include "OculusXRHandComponent.h"
+#endif
 #include "Kismet/GameplayStatics.h"
 #include <chrono>
 
@@ -253,6 +255,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	}
 	else if (Object.Key->IsA(APawn::StaticClass()))
 	{
+#ifdef WIN32
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
 			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
@@ -285,6 +288,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 		FString ObjectName = Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
+#endif
 	}
 	else if (Object.Key != nullptr)
 	{
@@ -387,6 +391,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			}
 		}
 
+#ifdef WIN32
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 		{
 			for (UActorComponent *ActorComponent : Object.Key->GetComponentsByTag(UOculusXRHandComponent::StaticClass(), *Tag))
@@ -405,6 +410,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				}
 			}
 		}
+#endif
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
 					   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
@@ -551,7 +557,7 @@ TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FAp
 {
 	RequestMetaDataJson = MakeShareable(new FJsonObject);
 	const TSharedPtr<FJsonObject> SimulationApiCallbacksJson = MakeShareable(new FJsonObject);
-	for (const TPair<const FString, FApiCallbacks> &SimulationApiCallback : SimulationApiCallbacks)
+	for (const TPair<FString, FApiCallbacks> &SimulationApiCallback : SimulationApiCallbacks)
 	{
 		TArray<TSharedPtr<FJsonValue>> SimulationApiCallbacksJsonValues;
 		for (const FApiCallback &ApiCallback : SimulationApiCallback.Value.ApiCallbacks)
@@ -588,7 +594,7 @@ TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FAp
 
 	TMap<FString, FApiCallbacks> ApiCallbacksResponse;
 	TSharedPtr<FJsonObject> SimulationApiCallbacksResponseJson = ResponseMetaDataJson->GetObjectField(TEXT("api_callbacks_response"));
-	for (const TPair<const FString, FApiCallbacks> &SimulationApiCallback : SimulationApiCallbacks)
+	for (const TPair<FString, FApiCallbacks> &SimulationApiCallback : SimulationApiCallbacks)
 	{
 		if (!SimulationApiCallbacksResponseJson->HasField(SimulationApiCallback.Key))
 		{
@@ -600,7 +606,7 @@ TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FAp
 		FApiCallbacks ApiCallbacks;
 		for (const TSharedPtr<FJsonValue> &ApiCallbackResponseJsonValue : ApiCallbacksResponseJsonValue)
 		{
-			for (const TPair<const FString, TSharedPtr<FJsonValue>> &ApiCallbackResponse : ApiCallbackResponseJsonValue->AsObject()->Values)
+			for (const TPair<FString, TSharedPtr<FJsonValue>> &ApiCallbackResponse : ApiCallbackResponseJsonValue->AsObject()->Values)
 			{
 				TArray<FString> Arguments;
 				for (const TSharedPtr<FJsonValue> &Argument : ApiCallbackResponse.Value->AsArray())
@@ -638,8 +644,8 @@ bool FMultiverseClient::compute_request_and_response_meta_data()
 	// UE_LOG(LogMultiverseClient, Log, TEXT("%s"), *ResponseMetaDataString)
 
 	bool bParseSuccess = FJsonSerializer::Deserialize(Reader, ResponseMetaDataJson) &&
-						 ResponseMetaDataJson->HasField("time") &&
-						 ResponseMetaDataJson->GetNumberField("time") >= 0.0;
+						 ResponseMetaDataJson->HasField(TEXT("time")) &&
+						 ResponseMetaDataJson->GetNumberField(TEXT("time")) >= 0.0;
 
 	bComputingRequestAndResponseMetaData = false;
 
@@ -1010,7 +1016,7 @@ void FMultiverseClient::bind_api_callbacks()
 	for (const TSharedPtr<FJsonValue> &ApiCallbackJsonValue : ResponseMetaDataJson->GetArrayField(TEXT("api_callbacks")))
 	{
 		const TSharedPtr<FJsonObject> ApiCallbackJson = ApiCallbackJsonValue->AsObject();
-		for (const TPair<const FString, TSharedPtr<FJsonValue>> &ApiCallbackPair : ApiCallbackJson->Values)
+		for (const TPair<FString, TSharedPtr<FJsonValue>> &ApiCallbackPair : ApiCallbackJson->Values)
 		{
 			if (ApiCallbackPair.Key.Compare(TEXT("is_unreal")) == 0)
 			{
@@ -1030,7 +1036,7 @@ void FMultiverseClient::bind_api_callbacks_response()
 	for (const TSharedPtr<FJsonValue> &ApiCallbackJsonValue : ResponseMetaDataJson->GetArrayField(TEXT("api_callbacks")))
 	{
 		const TSharedPtr<FJsonObject> ApiCallbackResponseJson = MakeShareable(new FJsonObject);
-		for (const TPair<const FString, TSharedPtr<FJsonValue>> &ApiCallbackPair : ApiCallbackJsonValue->AsObject()->Values)
+		for (const TPair<FString, TSharedPtr<FJsonValue>> &ApiCallbackPair : ApiCallbackJsonValue->AsObject()->Values)
 		{
 			if (ApiCallbackPair.Key.Compare(TEXT("is_unreal")) == 0)
 			{
@@ -1244,6 +1250,8 @@ void FMultiverseClient::bind_send_data()
 					UE_LOG(LogMultiverseClient, Error, TEXT("CachedComponents does not contain %s"), *SendData.Key)
 				}
 			}
+
+#ifdef WIN32
 			APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
 			for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
 			{
@@ -1278,6 +1286,7 @@ void FMultiverseClient::bind_send_data()
 					}
 				}
 			}
+#endif
 		}
 	}
 }
