@@ -532,13 +532,9 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 	WorldName = InWorldName;
 	SimulationName = InSimulationName;
 
-	const FString ServerSocketAddr = ServerHost + TEXT(":") + ServerPort;
-	server_socket_addr = TCHAR_TO_UTF8(*ServerSocketAddr);
-
 	host = TCHAR_TO_UTF8(*ServerHost);
-	port = TCHAR_TO_UTF8(*ClientPort);
-
-	printf("ServerSocketAddr: %s\n", server_socket_addr.c_str());
+	server_port = TCHAR_TO_UTF8(*ServerPort);
+	client_port = TCHAR_TO_UTF8(*ClientPort);
 
 	connect();
 

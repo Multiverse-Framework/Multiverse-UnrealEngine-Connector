@@ -46,10 +46,10 @@ public:
 
 public:
     /**
-     * @brief Connect the socket with host and port
+     * @brief Connect the socket with host, server_port, and client_port
      *
      */
-    void connect(const std::string &in_host, const std::string &in_port);
+    void connect(const std::string &in_host, const std::string &in_server_port, const std::string &in_client_port);
 
     /**
      * @brief Connect the socket
@@ -85,19 +85,6 @@ public:
      * @return double current time in time_unit
      */
     virtual double get_time_now() const;
-
-public:
-    /**
-     * @brief The host IP address of the client
-     * 
-     */
-    std::string host;
-
-    /**
-     * @brief The port number of the client, each client has a unique port number
-     * 
-     */
-    std::string port;
 
 protected:
     /**
@@ -270,10 +257,22 @@ private:
 
 protected:
     /**
-     * @brief The socket address of the server
+     * @brief The host IP address of the server
      * 
      */
-    std::string server_socket_addr = "tcp://127.0.0.1:7000";
+    std::string host;
+
+    /**
+     * @brief The port number of the server
+     * 
+     */
+    std::string server_port = "7000";
+
+    /**
+     * @brief The port number of the client, each client has a unique port number
+     * 
+     */
+    std::string client_port;
 
     /**
      * @brief The buffer for the send data
