@@ -5,7 +5,7 @@
   "FriendlyName": "MultiverseConnector",
   "Description": "",
   "Category": "",
-  "CreatedBy": "Giang Hoang Nguyen",
+  "CreatedBy": "Giang Nguyen",
   "CreatedByURL": "https://github.com/HoangGiang93",
   "DocsURL": "https://github.com/Multiverse-Framework/Multiverse-UnrealEngine-Connector.git",
   "MarketplaceURL": "",
@@ -23,6 +23,12 @@
       "Name": "MultiverseConnectorEditor",
       "Type": "UncookedOnly",
       "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "OculusXR",
+      "Enabled": true
     }
   ]
 }
