@@ -53,6 +53,12 @@ public:
 	UPROPERTY(EditAnywhere)
 	TMap<AActor*, FAttributeContainer> ReceiveObjects;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FAttributeDataContainer> SendCustomObjects;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, FAttributeDataContainer> ReceiveCustomObjects;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "API Callbacks")
 	bool bSimulationApiCallbacksEnabled = false;
 

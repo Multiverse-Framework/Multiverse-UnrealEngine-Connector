@@ -65,8 +65,7 @@ void UMultiverseClientComponent::Init()
         }
     }
     UE_LOG(LogMultiverseClientComponent, Log, TEXT("ClientPort: %s"), *ClientPort)
-    
-    MultiverseClient.Init(ServerHost, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, GetWorld());
+    MultiverseClient.Init(ServerHost, ServerPort, ClientPort, WorldName, SimulationName, SendObjects, ReceiveObjects, &SendCustomObjects, &ReceiveCustomObjects, GetWorld());
 }
 
 void UMultiverseClientComponent::Tick(float DeltaTime)

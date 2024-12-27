@@ -15,6 +15,8 @@ enum class EAttribute : uint8
 	JointQuaternion,
 	JointRvalue,
 	JointTvalue,
+	CmdJointRvalue,
+	CmdJointTvalue,
 	Position,
 	Quaternion,
 	RGB_3840_2160,
@@ -38,6 +40,19 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EAttribute> Attributes;
+};
+
+USTRUCT(Blueprintable)
+struct FAttributeDataContainer
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<EAttribute> Attributes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<double> Data;
 };
 
 USTRUCT(Blueprintable)
@@ -71,8 +86,10 @@ public:
 public:
 	void Init(const FString &ServerHost, const FString &ServerPort, const FString &ClientPort,
 			  const FString &WorldName, const FString &SimulationName,
-			  TMap<AActor *, FAttributeContainer> &SendObjects,
-			  TMap<AActor *, FAttributeContainer> &ReceiveObjects,
+			  TMap<AActor *, FAttributeContainer> &InSendObjects,
+			  TMap<AActor *, FAttributeContainer> &InReceiveObjects,
+			  TMap<FString, FAttributeDataContainer> *InSendCustomObjectsPtr,
+			  TMap<FString, FAttributeDataContainer> *InReceiveCustomObjectsPtr,
 			  UWorld *World);
 
 	TMap<FString, FApiCallbacks> CallApis(const TMap<FString, FApiCallbacks> &SimulationApiCallbacks);
@@ -81,6 +98,10 @@ private:
 	TMap<AActor *, FAttributeContainer> SendObjects;
 
 	TMap<AActor *, FAttributeContainer> ReceiveObjects;
+
+	TMap<FString, FAttributeDataContainer> *SendCustomObjectsPtr;
+
+	TMap<FString, FAttributeDataContainer> *ReceiveCustomObjectsPtr;
 
 	TSharedPtr<FJsonObject> RequestMetaDataJson;
 

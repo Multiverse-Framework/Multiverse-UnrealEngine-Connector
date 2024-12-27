@@ -27,6 +27,8 @@ TMap<EAttribute, TArray<double>> AttributeDoubleDataMap =
 		{EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
 		{EAttribute::JointRvalue, {0.0}},
 		{EAttribute::JointTvalue, {0.0}},
+		{EAttribute::CmdJointRvalue, {0.0}},
+		{EAttribute::CmdJointTvalue, {0.0}},
 		{EAttribute::JointPosition, {0.0, 0.0, 0.0}},
 		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
 
@@ -50,6 +52,8 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("quaternion"), EAttribute::Quaternion},
 		{TEXT("joint_rvalue"), EAttribute::JointRvalue},
 		{TEXT("joint_tvalue"), EAttribute::JointTvalue},
+		{TEXT("cmd_joint_rvalue"), EAttribute::CmdJointRvalue},
+		{TEXT("cmd_joint_tvalue"), EAttribute::CmdJointTvalue},
 		{TEXT("joint_position"), EAttribute::JointPosition},
 		{TEXT("joint_quaternion"), EAttribute::JointQuaternion},
 		{TEXT("rgb_3840_2160"), EAttribute::RGB_3840_2160},
@@ -282,6 +286,20 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	}
 }
 
+static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
+						 TPair<FString, FAttributeDataContainer> &CustomObject)
+{
+	CustomObject.Value.Data.Empty();
+	TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
+	for (const EAttribute &Attribute : CustomObject.Value.Attributes)
+	{
+		CustomObject.Value.Data.Append(AttributeDoubleDataMap[Attribute]);
+		const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
+		AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
+	}
+	MetaDataJson->SetArrayField(CustomObject.Key, AttributeJsonArray);
+}
+
 static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 						  const TPair<AActor *, FAttributeContainer> &Object)
 {
@@ -374,6 +392,17 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Quaternion));
 			}
 		}
+		
+		if (SkeletalMeshComponents.Num() == 0)
+		{
+			for (const EAttribute &Attribute : Object.Value.Attributes)
+			{
+				if (Attribute == EAttribute::Position || Attribute == EAttribute::Quaternion)
+				{
+					DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
+				}
+			}
+		}
 
 #ifdef WIN32
 		for (const FString &Tag : {TEXT("LeftHand"), TEXT("RightHand")})
@@ -413,7 +442,21 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		{
 			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
 		}
+
+		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
+					   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
 	}
+}
+
+static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
+						  const TPair<FString, FAttributeDataContainer> &CustomObject)
+{
+	for (const EAttribute &Attribute : CustomObject.Value.Attributes)
+	{
+		DataArray.Add(TPair<FString, EAttribute>(CustomObject.Key, Attribute));
+	}
+	DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
+				   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
 }
 
 FMultiverseClient::FMultiverseClient()
@@ -524,10 +567,14 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 							 const FString &InWorldName, const FString &InSimulationName,
 							 TMap<AActor *, FAttributeContainer> &InSendObjects,
 							 TMap<AActor *, FAttributeContainer> &InReceiveObjects,
+							 TMap<FString, FAttributeDataContainer> *InSendCustomObjectsPtr,
+							 TMap<FString, FAttributeDataContainer> *InReceiveCustomObjectsPtr,
 							 UWorld *InWorld)
 {
 	SendObjects = InSendObjects;
 	ReceiveObjects = InReceiveObjects;
+	SendCustomObjectsPtr = InSendCustomObjectsPtr;
+	ReceiveCustomObjectsPtr = InReceiveCustomObjectsPtr;
 	World = InWorld;
 	WorldName = InWorldName;
 	SimulationName = InSimulationName;
@@ -869,6 +916,16 @@ void FMultiverseClient::bind_request_meta_data()
 		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveObject, CachedActors, CachedComponents, CachedBoneNames);
 	}
 
+	for (TPair<FString, FAttributeDataContainer> &SendCustomObject : *SendCustomObjectsPtr)
+	{
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("send")), SendCustomObject);
+	}
+
+	for (TPair<FString, FAttributeDataContainer> &ReceiveCustomObject : *ReceiveCustomObjectsPtr)
+	{
+		BindMetaData(RequestMetaDataJson->GetObjectField(TEXT("receive")), ReceiveCustomObject);
+	}
+
 	FString RequestMetaDataString;
 	TSharedRef<TJsonWriter<TCHAR>> Writer = TJsonWriterFactory<TCHAR>::Create(&RequestMetaDataString);
 	FJsonSerializer::Serialize(RequestMetaDataJson.ToSharedRef(), Writer, true);
@@ -897,7 +954,27 @@ void FMultiverseClient::bind_response_meta_data()
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
 	{
 		const FString AttributeName = *AttributeStringMap.FindKey(SendData.Value);
-		if (CachedActors.Contains(SendData.Key))
+		if ((*SendCustomObjectsPtr).Contains(SendData.Key))
+		{
+			TArray<TSharedPtr<FJsonValue>> CustomData = ResponseSendObjects->GetArrayField(AttributeName);
+			size_t CustomDataAdr = 0;
+			for (const EAttribute &Attribute: (*SendCustomObjectsPtr)[SendData.Key].Attributes)
+			{
+				if (Attribute != SendData.Value)
+				{
+					CustomDataAdr += AttributeDoubleDataMap[Attribute].Num();
+				}
+				else
+				{
+					for (size_t i = 0; i < AttributeDoubleDataMap[Attribute].Num(); i++)
+					{
+						(*SendCustomObjectsPtr)[SendData.Key].Data[CustomDataAdr + i] = CustomData[i]->AsNumber();
+					}
+					break;
+				}
+			}
+		}
+		else if (CachedActors.Contains(SendData.Key))
 		{
 			if (CachedActors[SendData.Key] == nullptr)
 			{
@@ -1042,7 +1119,7 @@ void FMultiverseClient::bind_api_callbacks_response()
 
 void FMultiverseClient::init_send_and_receive_data()
 {
-	for (TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
+	for (const TPair<AActor *, FAttributeContainer> &SendObject : SendObjects)
 	{
 		if (SendObject.Key == nullptr)
 		{
@@ -1053,7 +1130,7 @@ void FMultiverseClient::init_send_and_receive_data()
 		BindDataArray(SendDataArray, SendObject);
 	}
 
-	for (TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
+	for (const TPair<AActor *, FAttributeContainer> &ReceiveObject : ReceiveObjects)
 	{
 		if (ReceiveObject.Key == nullptr)
 		{
@@ -1062,6 +1139,16 @@ void FMultiverseClient::init_send_and_receive_data()
 		}
 
 		BindDataArray(ReceiveDataArray, ReceiveObject);
+	}
+
+	for (const TPair<FString, FAttributeDataContainer> &SendCustomObject : *SendCustomObjectsPtr)
+	{
+		BindDataArray(SendDataArray, SendCustomObject);
+	}
+
+	for (const TPair<FString, FAttributeDataContainer> &ReceiveCustomObject : *ReceiveCustomObjectsPtr)
+	{
+		BindDataArray(ReceiveDataArray, ReceiveCustomObject);
 	}
 }
 
@@ -1078,7 +1165,14 @@ void FMultiverseClient::bind_send_data()
 
 	for (const TPair<FString, EAttribute> &SendData : SendDataArray)
 	{
-		if (CachedActors.Contains(SendData.Key))
+		if ((*SendCustomObjectsPtr).Contains(SendData.Key))
+		{
+			for (double Data : (*SendCustomObjectsPtr)[SendData.Key].Data)
+			{
+				*send_buffer_double_addr++ = Data;
+			}
+		}
+		else if (CachedActors.Contains(SendData.Key))
 		{
 			if (CachedActors[SendData.Key] == nullptr)
 			{
@@ -1231,13 +1325,6 @@ void FMultiverseClient::bind_send_data()
 					UE_LOG(LogMultiverseClient, Error, TEXT("This should not happen"))
 				}
 			}
-			else
-			{
-				if (!SendData.Key.Contains(TEXT("LeftHand")) && !SendData.Key.Contains(TEXT("RightHand")))
-				{
-					UE_LOG(LogMultiverseClient, Error, TEXT("CachedComponents does not contain %s"), *SendData.Key)
-				}
-			}
 
 #ifdef WIN32
 			APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
@@ -1288,6 +1375,13 @@ void FMultiverseClient::bind_receive_data()
 	double *receive_buffer_double_addr = receive_buffer.buffer_double.data;
 	for (const TPair<FString, EAttribute> &ReceiveData : ReceiveDataArray)
 	{
+		if ((*ReceiveCustomObjectsPtr).Contains(ReceiveData.Key))
+		{
+			for (double &Data : (*ReceiveCustomObjectsPtr)[ReceiveData.Key].Data)
+			{
+				Data = *receive_buffer_double_addr++;
+			}
+		}
 		if (CachedActors.Contains(ReceiveData.Key))
 		{
 			if (CachedActors[ReceiveData.Key] == nullptr)
