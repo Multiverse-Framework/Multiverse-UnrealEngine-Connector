@@ -289,12 +289,11 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 TPair<FString, FAttributeDataContainer> &CustomObject)
 {
-	CustomObject.Value.Data.Empty();
 	TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
-	for (const EAttribute &Attribute : CustomObject.Value.Attributes)
+	for (TPair<EAttribute, FDataContainer> &Attribute : CustomObject.Value.Attributes)
 	{
-		CustomObject.Value.Data.Append(AttributeDoubleDataMap[Attribute]);
-		const FString AttributeName = *AttributeStringMap.FindKey(Attribute);
+		Attribute.Value.Data = AttributeDoubleDataMap[Attribute.Key];
+		const FString AttributeName = *AttributeStringMap.FindKey(Attribute.Key);
 		AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 	}
 	MetaDataJson->SetArrayField(CustomObject.Key, AttributeJsonArray);
@@ -451,9 +450,9 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 						  const TPair<FString, FAttributeDataContainer> &CustomObject)
 {
-	for (const EAttribute &Attribute : CustomObject.Value.Attributes)
+	for (const TPair<EAttribute, FDataContainer> &Attribute : CustomObject.Value.Attributes)
 	{
-		DataArray.Add(TPair<FString, EAttribute>(CustomObject.Key, Attribute));
+		DataArray.Add(TPair<FString, EAttribute>(CustomObject.Key, Attribute.Key));
 	}
 	DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
 				   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
@@ -957,20 +956,16 @@ void FMultiverseClient::bind_response_meta_data()
 		if ((*SendCustomObjectsPtr).Contains(SendData.Key))
 		{
 			TArray<TSharedPtr<FJsonValue>> CustomData = ResponseSendObjects->GetArrayField(AttributeName);
-			size_t CustomDataAdr = 0;
-			for (const EAttribute &Attribute: (*SendCustomObjectsPtr)[SendData.Key].Attributes)
+			for (TPair<EAttribute, FDataContainer> &Attribute: (*SendCustomObjectsPtr)[SendData.Key].Attributes)
 			{
-				if (Attribute != SendData.Value)
+				if (Attribute.Value.Data.Num() != CustomData.Num())
 				{
-					CustomDataAdr += AttributeDoubleDataMap[Attribute].Num();
+					UE_LOG(LogMultiverseClient, Warning, TEXT("Data Size from Client [%d] mismatch with Data Size from Server [%d]"), Attribute.Value.Data.Num(), CustomData.Num())
+					continue;
 				}
-				else
+				for (size_t i = 0; i < Attribute.Value.Data.Num(); i++)
 				{
-					for (size_t i = 0; i < AttributeDoubleDataMap[Attribute].Num(); i++)
-					{
-						(*SendCustomObjectsPtr)[SendData.Key].Data[CustomDataAdr + i] = CustomData[i]->AsNumber();
-					}
-					break;
+					Attribute.Value.Data[i] = CustomData[i]->AsNumber();
 				}
 			}
 		}
@@ -1167,9 +1162,12 @@ void FMultiverseClient::bind_send_data()
 	{
 		if ((*SendCustomObjectsPtr).Contains(SendData.Key))
 		{
-			for (double Data : (*SendCustomObjectsPtr)[SendData.Key].Data)
+			for (const TPair<EAttribute, FDataContainer> &Attribute : (*SendCustomObjectsPtr)[SendData.Key].Attributes)
 			{
-				*send_buffer_double_addr++ = Data;
+				for (const double &Data : Attribute.Value.Data)
+				{
+					*send_buffer_double_addr++ = Data;
+				}
 			}
 		}
 		else if (CachedActors.Contains(SendData.Key))
@@ -1377,9 +1375,12 @@ void FMultiverseClient::bind_receive_data()
 	{
 		if ((*ReceiveCustomObjectsPtr).Contains(ReceiveData.Key))
 		{
-			for (double &Data : (*ReceiveCustomObjectsPtr)[ReceiveData.Key].Data)
+			for (TPair<EAttribute, FDataContainer> &Attribute : (*ReceiveCustomObjectsPtr)[ReceiveData.Key].Attributes)
 			{
-				Data = *receive_buffer_double_addr++;
+				for (double &Data : Attribute.Value.Data)
+				{
+					Data = *receive_buffer_double_addr++;
+				}
 			}
 		}
 		if (CachedActors.Contains(ReceiveData.Key))

@@ -43,16 +43,23 @@ public:
 };
 
 USTRUCT(Blueprintable)
+struct FDataContainer
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<double> Data;
+};
+
+USTRUCT(Blueprintable)
 struct FAttributeDataContainer
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<EAttribute> Attributes;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<double> Data;
+	TMap<EAttribute, FDataContainer> Attributes;
 };
 
 USTRUCT(Blueprintable)
