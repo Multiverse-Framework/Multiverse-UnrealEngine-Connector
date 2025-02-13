@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games Inc. All Rights Reserved.
 
 #pragma once
 
@@ -11,22 +11,30 @@ THIRD_PARTY_INCLUDES_END
 UENUM()
 enum class EAttribute : uint8
 {
+	CmdJointAngularAcceleration,
+	CmdJointLinearAcceleration,
+	CmdJointAngularVelocity,
+	CmdJointLinearVelocity,
+	CmdJointRvalue,
+	CmdJointTvalue,
+	Depth_1280_1024,
+	Depth_128_128,
+	Depth_3840_2160,
+	Depth_640_480,
+	JointAngularAcceleration,
+	JointLinearAcceleration,
+	JointAngularVelocity,
+	JointLinearVelocity,
 	JointPosition,
 	JointQuaternion,
 	JointRvalue,
 	JointTvalue,
-	CmdJointRvalue,
-	CmdJointTvalue,
 	Position,
 	Quaternion,
-	RGB_3840_2160,
 	RGB_1280_1024,
-	RGB_640_480,
 	RGB_128_128,
-	Depth_3840_2160,
-	Depth_1280_1024,
-	Depth_640_480,
-	Depth_128_128
+	RGB_3840_2160,
+	RGB_640_480,
 };
 
 USTRUCT(Blueprintable)
