@@ -37,6 +37,8 @@ TMap<EAttribute, TArray<double>> AttributeDoubleDataMap =
 		{EAttribute::CmdJointLinearVelocity, {0.0}},
 		{EAttribute::CmdJointAngularAcceleration, {0.0}},
 		{EAttribute::CmdJointLinearAcceleration, {0.0}},
+		{EAttribute::CmdJointTorque, {0.0}},
+		{EAttribute::CmdJointForce, {0.0}},
 		{EAttribute::JointPosition, {0.0, 0.0, 0.0}},
 		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
 
@@ -70,6 +72,8 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("cmd_joint_linear_velocity"), EAttribute::CmdJointLinearVelocity},
 		{TEXT("cmd_joint_angular_acceleration"), EAttribute::CmdJointAngularAcceleration},
 		{TEXT("cmd_joint_linear_acceleration"), EAttribute::CmdJointLinearAcceleration},
+		{TEXT("cmd_joint_torque"), EAttribute::CmdJointTorque},
+		{TEXT("cmd_joint_force"), EAttribute::CmdJointForce},
 		{TEXT("joint_position"), EAttribute::JointPosition},
 		{TEXT("joint_quaternion"), EAttribute::JointQuaternion},
 		{TEXT("rgb_3840_2160"), EAttribute::RGB_3840_2160},
@@ -414,7 +418,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			{
 				if (Attribute == EAttribute::Position || Attribute == EAttribute::Quaternion)
 				{
-					DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
+					TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
+					if (!DataArray.Contains(NewData))
+					{
+						DataArray.Add(NewData);
+					}
 				}
 			}
 		}

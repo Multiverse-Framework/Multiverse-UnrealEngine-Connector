@@ -11,6 +11,8 @@ THIRD_PARTY_INCLUDES_END
 UENUM()
 enum class EAttribute : uint8
 {
+	CmdJointTorque,
+	CmdJointForce,
 	CmdJointAngularAcceleration,
 	CmdJointLinearAcceleration,
 	CmdJointAngularVelocity,
