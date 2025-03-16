@@ -290,7 +290,12 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						break;
 					}
 				}
+#if WITH_EDITOR
 				MetaDataJson->SetArrayField(BoneNameStr, FingerAttributeJsonArray);
+#else
+				const FString BoneNameStrModified = Tag + TEXT("_") + UEnum::GetDisplayValueAsText(BoneNameMapping.Key).ToString().Replace(TEXT(" "), TEXT("")).Replace(TEXT("_"), TEXT(""));
+				MetaDataJson->SetArrayField(BoneNameStrModified, FingerAttributeJsonArray);
+#endif
 			}
 		}
 		FString ObjectName = Object.Value.ObjectName;
