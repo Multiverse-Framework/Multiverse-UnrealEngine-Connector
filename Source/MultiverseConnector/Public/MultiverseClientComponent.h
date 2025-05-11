@@ -47,6 +47,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float UpdateRate = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bAutoSendHandsAndHead = false;
+
 	UPROPERTY(EditAnywhere)
 	TMap<AActor*, FAttributeContainer> SendObjects;
 

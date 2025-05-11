@@ -68,12 +68,15 @@ void AMultiverseClientActor::Init() const
 	}
 #endif
 
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
-	FAttributeContainer AttributeContainer;
-	AttributeContainer.ObjectName = TEXT("PlayerPawn");
-	AttributeContainer.Attributes.Add(EAttribute::Position);
-	AttributeContainer.Attributes.Add(EAttribute::Quaternion);
-	MultiverseClientComponent->SendObjects.Add(PlayerPawn, AttributeContainer);
+	if (MultiverseClientComponent->bAutoSendHandsAndHead)
+	{
+		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+		FAttributeContainer AttributeContainer;
+		AttributeContainer.ObjectName = TEXT("PlayerPawn");
+		AttributeContainer.Attributes.Add(EAttribute::Position);
+		AttributeContainer.Attributes.Add(EAttribute::Quaternion);
+		MultiverseClientComponent->SendObjects.Add(PlayerPawn, AttributeContainer);
+	}
 
 	MultiverseClientComponent->Init();
 }
