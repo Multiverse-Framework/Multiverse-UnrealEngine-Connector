@@ -15,6 +15,7 @@
 #ifdef WIN32
 #include "OculusXRHandComponent.h"
 #include "UObject/Class.h"
+#include "Camera/CameraComponent.h"
 #endif
 #include "Kismet/GameplayStatics.h"
 #include <chrono>
@@ -416,7 +417,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Quaternion));
 			}
 		}
-		
+
 		if (SkeletalMeshComponents.Num() == 0)
 		{
 			for (const EAttribute &Attribute : Object.Value.Attributes)
@@ -985,7 +986,7 @@ void FMultiverseClient::bind_response_meta_data()
 		if ((*SendCustomObjectsPtr).Contains(SendData.Key))
 		{
 			TArray<TSharedPtr<FJsonValue>> CustomData = ResponseSendObjects->GetArrayField(AttributeName);
-			for (TPair<EAttribute, FDataContainer> &Attribute: (*SendCustomObjectsPtr)[SendData.Key].Attributes)
+			for (TPair<EAttribute, FDataContainer> &Attribute : (*SendCustomObjectsPtr)[SendData.Key].Attributes)
 			{
 				if (Attribute.Value.Data.Num() != CustomData.Num())
 				{
@@ -1207,82 +1208,118 @@ void FMultiverseClient::bind_send_data()
 				continue;
 			}
 
-			switch (SendData.Value)
+			if (SendData.Key.Compare(TEXT("PlayerPawn")) == 0)
 			{
-			case EAttribute::Position:
-			{
-				const FVector ActorLocation = CachedActors[SendData.Key]->GetActorLocation();
-				*send_buffer_double_addr++ = ActorLocation.X;
-				*send_buffer_double_addr++ = ActorLocation.Y;
-				*send_buffer_double_addr++ = ActorLocation.Z;
-				break;
-			}
-
-			case EAttribute::Quaternion:
-			{
-				const FQuat ActorQuat = CachedActors[SendData.Key]->GetActorQuat();
-				*send_buffer_double_addr++ = ActorQuat.W;
-				*send_buffer_double_addr++ = ActorQuat.X;
-				*send_buffer_double_addr++ = ActorQuat.Y;
-				*send_buffer_double_addr++ = ActorQuat.Z;
-				break;
-			}
-
-			case EAttribute::RGB_3840_2160:
-			case EAttribute::RGB_1280_1024:
-			case EAttribute::RGB_640_480:
-			case EAttribute::RGB_128_128:
-			case EAttribute::Depth_3840_2160:
-			case EAttribute::Depth_1280_1024:
-			case EAttribute::Depth_640_480:
-			case EAttribute::Depth_128_128:
-			{
-				TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
-				CachedActors[SendData.Key]->GetComponents(SceneCaptureComponents);
-				const FString AttributeName = *AttributeStringMap.FindKey(SendData.Value);
-				for (USceneCaptureComponent2D *SceneCaptureComponent : SceneCaptureComponents)
+				APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+				const FString Tag = TEXT("Head");
+				TArray<UActorComponent *> ActorComponents = PlayerPawn->GetComponentsByTag(UCameraComponent::StaticClass(), *Tag);
+				if (ActorComponents.Num() != 1)
 				{
-					if (!SceneCaptureComponent->ComponentTags.Contains(*AttributeName) || SceneCaptureComponent->TextureTarget == nullptr)
-					{
-						continue;
-					}
-					FTextureRenderTargetResource *TextureRenderTargetResource = SceneCaptureComponent->TextureTarget->GameThread_GetRenderTargetResource();
-					TArray<FColor> ColorArray;
-					FReadSurfaceDataFlags ReadSurfaceDataFlags;
-					ReadSurfaceDataFlags.SetLinearToGamma(false);
-					TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
-
-					const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
-					const int ExpectedDataSize = AttributeUint8DataMap.Contains(SendData.Value) ? AttributeUint8DataMap[SendData.Value].Num() / 3 : AttributeUint16DataMap[SendData.Value].Num();
-					if (DataSize != ExpectedDataSize)
-					{
-						UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != ExpectedDataSize %d"), 3 * DataSize, ExpectedDataSize)
-					}
-					else
-					{
-						if (SendData.Value == EAttribute::RGB_3840_2160 || SendData.Value == EAttribute::RGB_1280_1024 || SendData.Value == EAttribute::RGB_640_480 || SendData.Value == EAttribute::RGB_128_128)
-						{
-							for (int i = 0; i < DataSize; i++)
-							{
-								*send_buffer_uint8_addr++ = ColorArray[i].R;
-								*send_buffer_uint8_addr++ = ColorArray[i].G;
-								*send_buffer_uint8_addr++ = ColorArray[i].B;
-							}
-						}
-						else if (SendData.Value == EAttribute::Depth_3840_2160 || SendData.Value == EAttribute::Depth_1280_1024 || SendData.Value == EAttribute::Depth_640_480 || SendData.Value == EAttribute::Depth_128_128)
-						{
-							for (int i = 0; i < DataSize; i++)
-							{
-								*send_buffer_uint16_addr++ = ColorArray[i].R;
-							}
-						}
-					}
+					UE_LOG(LogMultiverseClient, Warning, TEXT("Found %d %s"), ActorComponents.Num(), *Tag)
+					continue;
 				}
-				break;
-			}
+				UCameraComponent *CameraComponent = Cast<UCameraComponent>(ActorComponents[0]);
+				switch (SendData.Value)
+				{
+				case EAttribute::Position:
+				{
+					const FVector CameraLocation = CameraComponent->GetComponentLocation();
+					*send_buffer_double_addr++ = CameraLocation.X;
+					*send_buffer_double_addr++ = CameraLocation.Y;
+					*send_buffer_double_addr++ = CameraLocation.Z;
+					break;
+				}
 
-			default:
-				break;
+				case EAttribute::Quaternion:
+				{
+					const FQuat CameraQuat = CameraComponent->GetComponentQuat();
+					*send_buffer_double_addr++ = CameraQuat.W;
+					*send_buffer_double_addr++ = CameraQuat.X;
+					*send_buffer_double_addr++ = CameraQuat.Y;
+					*send_buffer_double_addr++ = CameraQuat.Z;
+					break;
+				}
+				}
+			}
+			else
+			{
+				switch (SendData.Value)
+				{
+				case EAttribute::Position:
+				{
+					const FVector ActorLocation = CachedActors[SendData.Key]->GetActorLocation();
+					*send_buffer_double_addr++ = ActorLocation.X;
+					*send_buffer_double_addr++ = ActorLocation.Y;
+					*send_buffer_double_addr++ = ActorLocation.Z;
+					break;
+				}
+
+				case EAttribute::Quaternion:
+				{
+					const FQuat ActorQuat = CachedActors[SendData.Key]->GetActorQuat();
+					*send_buffer_double_addr++ = ActorQuat.W;
+					*send_buffer_double_addr++ = ActorQuat.X;
+					*send_buffer_double_addr++ = ActorQuat.Y;
+					*send_buffer_double_addr++ = ActorQuat.Z;
+					break;
+				}
+
+				case EAttribute::RGB_3840_2160:
+				case EAttribute::RGB_1280_1024:
+				case EAttribute::RGB_640_480:
+				case EAttribute::RGB_128_128:
+				case EAttribute::Depth_3840_2160:
+				case EAttribute::Depth_1280_1024:
+				case EAttribute::Depth_640_480:
+				case EAttribute::Depth_128_128:
+				{
+					TArray<USceneCaptureComponent2D *> SceneCaptureComponents;
+					CachedActors[SendData.Key]->GetComponents(SceneCaptureComponents);
+					const FString AttributeName = *AttributeStringMap.FindKey(SendData.Value);
+					for (USceneCaptureComponent2D *SceneCaptureComponent : SceneCaptureComponents)
+					{
+						if (!SceneCaptureComponent->ComponentTags.Contains(*AttributeName) || SceneCaptureComponent->TextureTarget == nullptr)
+						{
+							continue;
+						}
+						FTextureRenderTargetResource *TextureRenderTargetResource = SceneCaptureComponent->TextureTarget->GameThread_GetRenderTargetResource();
+						TArray<FColor> ColorArray;
+						FReadSurfaceDataFlags ReadSurfaceDataFlags;
+						ReadSurfaceDataFlags.SetLinearToGamma(false);
+						TextureRenderTargetResource->ReadPixels(ColorArray, ReadSurfaceDataFlags);
+
+						const int DataSize = SceneCaptureComponent->TextureTarget->SizeX * SceneCaptureComponent->TextureTarget->SizeY;
+						const int ExpectedDataSize = AttributeUint8DataMap.Contains(SendData.Value) ? AttributeUint8DataMap[SendData.Value].Num() / 3 : AttributeUint16DataMap[SendData.Value].Num();
+						if (DataSize != ExpectedDataSize)
+						{
+							UE_LOG(LogMultiverseClient, Warning, TEXT("DataSize %d != ExpectedDataSize %d"), 3 * DataSize, ExpectedDataSize)
+						}
+						else
+						{
+							if (SendData.Value == EAttribute::RGB_3840_2160 || SendData.Value == EAttribute::RGB_1280_1024 || SendData.Value == EAttribute::RGB_640_480 || SendData.Value == EAttribute::RGB_128_128)
+							{
+								for (int i = 0; i < DataSize; i++)
+								{
+									*send_buffer_uint8_addr++ = ColorArray[i].R;
+									*send_buffer_uint8_addr++ = ColorArray[i].G;
+									*send_buffer_uint8_addr++ = ColorArray[i].B;
+								}
+							}
+							else if (SendData.Value == EAttribute::Depth_3840_2160 || SendData.Value == EAttribute::Depth_1280_1024 || SendData.Value == EAttribute::Depth_640_480 || SendData.Value == EAttribute::Depth_128_128)
+							{
+								for (int i = 0; i < DataSize; i++)
+								{
+									*send_buffer_uint16_addr++ = ColorArray[i].R;
+								}
+							}
+						}
+					}
+					break;
+				}
+
+				default:
+					break;
+				}
 			}
 		}
 		else if (CachedBoneNames.Contains(SendData.Key))
@@ -1366,7 +1403,7 @@ void FMultiverseClient::bind_send_data()
 						continue;
 					}
 					UOculusXRHandComponent *OculusXRHandComponent = Cast<UOculusXRHandComponent>(ActorComponents[0]);
-					
+
 					const EOculusXRBone *Bone = OculusXRHandComponent->BoneNameMappings.FindKey(*SendData.Key);
 					if (Bone == nullptr)
 					{
