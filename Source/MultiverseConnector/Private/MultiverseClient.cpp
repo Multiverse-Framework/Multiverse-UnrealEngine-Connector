@@ -100,7 +100,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						 const TPair<AActor *, FAttributeContainer> &Object,
 						 TMap<FString, AActor *> &CachedActors,
 						 TMap<FString, UActorComponent *> &CachedComponents,
-						 TMap<FString, TPair<UMultiverseAnim *, FName>> &CachedBoneNames)
+						 TMap<FString, TMap<UMultiverseAnim *, FName>> &CachedBoneNames)
 {
 	TArray<TSharedPtr<FJsonValue>> AttributeJsonArray;
 	if (Object.Key != nullptr)
@@ -230,14 +230,22 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 						Object.Value.Attributes.Contains(EAttribute::JointRvalue))
 					{
 						AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_rvalue")))};
-						CachedBoneNames.Add(BoneNameStr, TPair<UMultiverseAnim *, FName>(MultiverseAnim, BoneName));
+						if (!CachedBoneNames.Contains(BoneNameStr))
+						{
+							CachedBoneNames.Add(BoneNameStr, TMap<UMultiverseAnim *, FName>());
+						}
+						CachedBoneNames[BoneNameStr].Add(MultiverseAnim, BoneName);
 						MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
 					}
 					else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
 							 Object.Value.Attributes.Contains(EAttribute::JointTvalue))
 					{
 						AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_tvalue")))};
-						CachedBoneNames.Add(BoneNameStr, TPair<UMultiverseAnim *, FName>(MultiverseAnim, BoneName));
+						if (!CachedBoneNames.Contains(BoneNameStr))
+						{
+							CachedBoneNames.Add(BoneNameStr, TMap<UMultiverseAnim *, FName>());
+						}
+						CachedBoneNames[BoneNameStr].Add(MultiverseAnim, BoneName);
 						MetaDataJson->SetArrayField(BoneNameStr, AttributeJsonArray);
 					}
 				}
@@ -343,7 +351,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				Attribute == EAttribute::Depth_640_480 ||
 				Attribute == EAttribute::Depth_128_128)
 			{
-				DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
+				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
+				if (!DataArray.Contains(NewData))
+				{
+					DataArray.Add(NewData);
+				}
 			}
 		}
 
@@ -362,12 +374,20 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 						 (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone")))) &&
 						Object.Value.Attributes.Contains(EAttribute::JointRvalue))
 					{
-						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointRvalue));
+						const TPair<FString, EAttribute> NewData(BoneNameStr, EAttribute::JointRvalue);
+						if (!DataArray.Contains(NewData))
+						{
+							DataArray.Add(NewData);
+						}
 					}
 					else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
 							 Object.Value.Attributes.Contains(EAttribute::JointTvalue))
 					{
-						DataArray.Add(TPair<FString, EAttribute>(BoneNameStr, EAttribute::JointTvalue));
+						const TPair<FString, EAttribute> NewData(BoneNameStr, EAttribute::JointTvalue);
+						if (!DataArray.Contains(NewData))
+						{
+							DataArray.Add(NewData);
+						}
 					}
 				}
 			}
@@ -392,11 +412,19 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		{
 			if (Object.Value.Attributes.Contains(EAttribute::Position))
 			{
-				DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Position));
+				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, EAttribute::Position);
+				if (!DataArray.Contains(NewData))
+				{
+					DataArray.Add(NewData);
+				}
 			}
 			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 			{
-				DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, EAttribute::Quaternion));
+				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, EAttribute::Quaternion);
+				if (!DataArray.Contains(NewData))
+				{
+					DataArray.Add(NewData);
+				}
 			}
 		}
 		else
@@ -410,11 +438,19 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		{
 			if (Object.Value.Attributes.Contains(EAttribute::Position))
 			{
-				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Position));
+				const TPair<FString, EAttribute> NewData(SkeletalMeshComponent->GetName(), EAttribute::Position);
+				if (!DataArray.Contains(NewData))
+				{
+					DataArray.Add(NewData);
+				}
 			}
 			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 			{
-				DataArray.Add(TPair<FString, EAttribute>(SkeletalMeshComponent->GetName(), EAttribute::Quaternion));
+				const TPair<FString, EAttribute> NewData(SkeletalMeshComponent->GetName(), EAttribute::Quaternion);
+				if (!DataArray.Contains(NewData))
+				{
+					DataArray.Add(NewData);
+				}
 			}
 		}
 
@@ -452,11 +488,19 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			{
 				if (Object.Value.Attributes.Contains(EAttribute::Position))
 				{
-					DataArray.Add(TPair<FString, EAttribute>(BoneNameMapping.Value.ToString(), EAttribute::Position));
+					const TPair<FString, EAttribute> NewData(BoneNameMapping.Value.ToString(), EAttribute::Position);
+					if (!DataArray.Contains(NewData))
+					{
+						DataArray.Add(NewData);
+					}
 				}
 				if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 				{
-					DataArray.Add(TPair<FString, EAttribute>(BoneNameMapping.Value.ToString(), EAttribute::Quaternion));
+					const TPair<FString, EAttribute> NewData(BoneNameMapping.Value.ToString(), EAttribute::Quaternion);
+					if (!DataArray.Contains(NewData))
+					{
+						DataArray.Add(NewData);
+					}
 				}
 			}
 		}
@@ -469,7 +513,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 	{
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
-			DataArray.Add(TPair<FString, EAttribute>(Object.Value.ObjectName, Attribute));
+			const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
+			if (!DataArray.Contains(NewData))
+			{
+				DataArray.Add(NewData);
+			}
 		}
 
 		DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
@@ -482,7 +530,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 {
 	for (const TPair<EAttribute, FDataContainer> &Attribute : CustomObject.Value.Attributes)
 	{
-		DataArray.Add(TPair<FString, EAttribute>(CustomObject.Key, Attribute.Key));
+		const TPair<FString, EAttribute> NewData(CustomObject.Key, Attribute.Key);
+		if (!DataArray.Contains(NewData))
+		{
+			DataArray.Add(NewData);
+		}
 	}
 	DataArray.Sort([](const TPair<FString, EAttribute> &DataA, const TPair<FString, EAttribute> &DataB)
 				   { return DataB.Key.Compare(DataA.Key) > 0 || (DataB.Key.Compare(DataA.Key) == 0 && DataB.Value > DataA.Value); });
@@ -1070,7 +1122,10 @@ void FMultiverseClient::bind_response_meta_data()
 				{
 					continue;
 				}
-				CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue[0]->AsNumber(), 0.f, 0.f)));
+				for (TPair<UMultiverseAnim *, FName> &BoneNameMapping : CachedBoneNames[SendData.Key])
+				{
+					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetRotation(FQuat(FRotator(JointRvalue[0]->AsNumber(), 0.f, 0.f)));
+				}
 				break;
 			}
 
@@ -1086,7 +1141,10 @@ void FMultiverseClient::bind_response_meta_data()
 				{
 					continue;
 				}
-				CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].SetTranslation(FVector(0.f, JointTvalue[0]->AsNumber(), 0.f));
+				for (TPair<UMultiverseAnim *, FName> &BoneNameMapping : CachedBoneNames[SendData.Key])
+				{
+					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetTranslation(FVector(0.f, JointTvalue[0]->AsNumber(), 0.f));;
+				}
 				break;
 			}
 
@@ -1328,15 +1386,23 @@ void FMultiverseClient::bind_send_data()
 			{
 			case EAttribute::JointRvalue:
 			{
-				const FQuat JointQuaternion = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetRotation();
-				*send_buffer_double_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
+				for (TPair<UMultiverseAnim *, FName> &BoneNameMapping : CachedBoneNames[SendData.Key])
+				{
+					const FQuat JointQuaternion = BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].GetRotation();
+					*send_buffer_double_addr++ = FMath::RadiansToDegrees(JointQuaternion.GetAngle());
+					break;
+				}
 				break;
 			}
 
 			case EAttribute::JointTvalue:
 			{
-				const FVector JointPosition = CachedBoneNames[SendData.Key].Key->JointPoses[CachedBoneNames[SendData.Key].Value].GetTranslation();
-				*send_buffer_double_addr++ = JointPosition.Y;
+				for (TPair<UMultiverseAnim *, FName> &BoneNameMapping : CachedBoneNames[SendData.Key])
+				{
+					const FVector JointPosition = BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].GetTranslation();
+					*send_buffer_double_addr++ = JointPosition.Y;
+					break;
+				}
 				break;
 			}
 
@@ -1484,24 +1550,26 @@ void FMultiverseClient::bind_receive_data()
 		}
 		else if (CachedBoneNames.Contains(ReceiveData.Key))
 		{
-			switch (ReceiveData.Value)
+			const double Jointvalue = *receive_buffer_double_addr++;
+			for (TPair<UMultiverseAnim *, FName> &BoneNameMapping : CachedBoneNames[ReceiveData.Key])
 			{
-			case EAttribute::JointRvalue:
-			{
-				const double JointRvalue = *receive_buffer_double_addr++;
-				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetRotation(FQuat(FRotator(JointRvalue, 0.f, 0.f)));
-				break;
-			}
+				switch (ReceiveData.Value)
+				{
+				case EAttribute::JointRvalue:
+				{
+					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetRotation(FQuat(FRotator(Jointvalue, 0.f, 0.f)));
+					break;
+				}
 
-			case EAttribute::JointTvalue:
-			{
-				const double JointTvalue = *receive_buffer_double_addr++;
-				CachedBoneNames[ReceiveData.Key].Key->JointPoses[CachedBoneNames[ReceiveData.Key].Value].SetTranslation(FVector(0.f, JointTvalue, 0.f));
-				break;
-			}
+				case EAttribute::JointTvalue:
+				{
+					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetTranslation(FVector(0.f, Jointvalue, 0.f));
+					break;
+				}
 
-			default:
-				break;
+				default:
+					break;
+				}
 			}
 		}
 	}

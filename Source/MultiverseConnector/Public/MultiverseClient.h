@@ -143,7 +143,7 @@ private:
 
 	TMap<FString, UActorComponent *> CachedComponents;
 
-	TMap<FString, TPair<class UMultiverseAnim *, FName>> CachedBoneNames;
+	TMap<FString, TMap<class UMultiverseAnim *, FName>> CachedBoneNames;
 
 	TMap<FLinearColor, FString> ColorMap;
 
