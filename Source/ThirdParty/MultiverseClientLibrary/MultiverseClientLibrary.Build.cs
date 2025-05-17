@@ -34,9 +34,6 @@ public class MultiverseClientLibrary : ModuleRules
 		{
 			string MultiverseClientLibPath = Path.Combine("$(PluginDir)", "Binaries", "Android", "libmultiverse_client.so");
 			PublicAdditionalLibraries.Add(MultiverseClientLibPath);
-			// string CxxLibPath = Path.Combine("$(PluginDir)", "Binaries", "Android", "libstdc++.so.6");
-			// PublicAdditionalLibraries.Add(CxxLibPath);
-			AdditionalPropertiesForReceipt.Add("AndroidPlugin", Path.Combine(ModuleDirectory, "MultiverseClient_APL.xml"));
 		}
 	}
 }
