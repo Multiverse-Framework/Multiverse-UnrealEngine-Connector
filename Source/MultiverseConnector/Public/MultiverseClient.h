@@ -49,6 +49,9 @@ public:
 	FString ObjectName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString ObjectPrefix;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<EAttribute> Attributes;
 };
 

@@ -209,7 +209,8 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	}
 	if (Object.Key->IsA(ASkeletalMeshActor::StaticClass()))
 	{
-		FString ObjectName = Object.Value.ObjectName;
+		const FString ObjectPrefix = Object.Value.ObjectPrefix;
+		const FString ObjectName = ObjectPrefix + Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 
@@ -307,14 +308,16 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 #endif
 			}
 		}
-		FString ObjectName = Object.Value.ObjectName;
+		const FString ObjectPrefix = Object.Value.ObjectPrefix;
+		const FString ObjectName = ObjectPrefix + Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 #endif
 	}
 	else if (Object.Key != nullptr)
 	{
-		FString ObjectName = Object.Value.ObjectName;
+		const FString ObjectPrefix = Object.Value.ObjectPrefix;
+		const FString ObjectName = ObjectPrefix + Object.Value.ObjectName;
 		CachedActors.Add(ObjectName, Object.Key);
 		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
 	}
@@ -338,6 +341,8 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 {
 	if (ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key))
 	{
+		const FString ObjectPrefix = Object.Value.ObjectPrefix;
+		const FString ObjectName = ObjectPrefix + Object.Value.ObjectName;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
 			if (Attribute == EAttribute::Position ||
@@ -351,7 +356,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 				Attribute == EAttribute::Depth_640_480 ||
 				Attribute == EAttribute::Depth_128_128)
 			{
-				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
+				const TPair<FString, EAttribute> NewData(ObjectName, Attribute);
 				if (!DataArray.Contains(NewData))
 				{
 					DataArray.Add(NewData);
@@ -374,7 +379,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 						 (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone")))) &&
 						Object.Value.Attributes.Contains(EAttribute::JointRvalue))
 					{
-						const TPair<FString, EAttribute> NewData(BoneNameStr, EAttribute::JointRvalue);
+						const TPair<FString, EAttribute> NewData(ObjectPrefix + BoneNameStr, EAttribute::JointRvalue);
 						if (!DataArray.Contains(NewData))
 						{
 							DataArray.Add(NewData);
@@ -383,7 +388,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 					else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
 							 Object.Value.Attributes.Contains(EAttribute::JointTvalue))
 					{
-						const TPair<FString, EAttribute> NewData(BoneNameStr, EAttribute::JointTvalue);
+						const TPair<FString, EAttribute> NewData(ObjectPrefix + BoneNameStr, EAttribute::JointTvalue);
 						if (!DataArray.Contains(NewData))
 						{
 							DataArray.Add(NewData);
@@ -406,13 +411,15 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 	}
 	else if (Object.Key->IsA(APawn::StaticClass()))
 	{
+		const FString ObjectPrefix = Object.Value.ObjectPrefix;
+		const FString ObjectName = ObjectPrefix + Object.Value.ObjectName;
 		TArray<UCameraComponent *> CameraComponents;
 		Object.Key->GetComponents(CameraComponents);
 		if (CameraComponents.Num() == 1)
 		{
 			if (Object.Value.Attributes.Contains(EAttribute::Position))
 			{
-				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, EAttribute::Position);
+				const TPair<FString, EAttribute> NewData(ObjectName, EAttribute::Position);
 				if (!DataArray.Contains(NewData))
 				{
 					DataArray.Add(NewData);
@@ -420,7 +427,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			}
 			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 			{
-				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, EAttribute::Quaternion);
+				const TPair<FString, EAttribute> NewData(ObjectName, EAttribute::Quaternion);
 				if (!DataArray.Contains(NewData))
 				{
 					DataArray.Add(NewData);
@@ -438,7 +445,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		{
 			if (Object.Value.Attributes.Contains(EAttribute::Position))
 			{
-				const TPair<FString, EAttribute> NewData(SkeletalMeshComponent->GetName(), EAttribute::Position);
+				const TPair<FString, EAttribute> NewData(ObjectPrefix + SkeletalMeshComponent->GetName(), EAttribute::Position);
 				if (!DataArray.Contains(NewData))
 				{
 					DataArray.Add(NewData);
@@ -446,7 +453,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 			}
 			if (Object.Value.Attributes.Contains(EAttribute::Quaternion))
 			{
-				const TPair<FString, EAttribute> NewData(SkeletalMeshComponent->GetName(), EAttribute::Quaternion);
+				const TPair<FString, EAttribute> NewData(ObjectPrefix + SkeletalMeshComponent->GetName(), EAttribute::Quaternion);
 				if (!DataArray.Contains(NewData))
 				{
 					DataArray.Add(NewData);
@@ -511,9 +518,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 	}
 	else if (Object.Key != nullptr)
 	{
+		const FString ObjectPrefix = Object.Value.ObjectPrefix;
+		const FString ObjectName = ObjectPrefix + Object.Value.ObjectName;
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
-			const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
+			const TPair<FString, EAttribute> NewData(ObjectName, Attribute);
 			if (!DataArray.Contains(NewData))
 			{
 				DataArray.Add(NewData);
