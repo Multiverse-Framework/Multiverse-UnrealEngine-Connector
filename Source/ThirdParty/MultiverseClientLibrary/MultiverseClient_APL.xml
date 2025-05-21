@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- steps to add to build additions -->
+<root xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- init section is always evaluated once per architecture -->
+    <init>
+        <setBool result="bSupported" value="false"/>
+            <isArch arch="arm64-v8a">
+                <setBool result="bSupported" value="true"/>
+            </isArch>
+    </init>
+
+    <!-- optional files or directories to copy to Intermediate/Android/APK -->
+    <resourceCopies>
+        <isArch arch="arm64-v8a">
+            <log text="Copying libmultiverse_client.so"/>
+            <copyFile src="$S(PluginDir)/../../../Binaries/Android/libmultiverse_client.so" dst="$S(BuildDir)/libs/arm64-v8a/libmultiverse_client.so"/>
+            <!-- <log text="Copying libstdc++.so.6"/>
+            <copyFile src="$S(PluginDir)/../../../Binaries/Android/libstdc++.so.6" dst="$S(BuildDir)/libs/arm64-v8a/libstdc++.so.6"/> -->
+            <!-- <log text="Copying libzmq.a"/>
+            <copyFile src="$S(PluginDir)/../../../Binaries/Android/libzmq.a" dst="$S(BuildDir)/libs/arm64-v8a/libzmq.a"/>-->
+        </isArch>
+    </resourceCopies>
+
+    <!-- optional libraries to load in GameActivity.java before libUnreal.so -->
+    <soLoadLibrary>
+        <if condition="bSupported">
+            <true>
+                <loadLibrary name="multiverse_client" failmsg="multiverse_client library not loaded and may be required for MultiverseClientLibrary."/>
+            </true>
+        </if>
+    </soLoadLibrary>
+</root>
