@@ -153,7 +153,7 @@ private:
 
 	TMap<FLinearColor, FString> ColorMap;
 
-	float StartTime;
+	float StartTime = -1.f;
 
 	bool bComputingRequestAndResponseMetaData = false;
 

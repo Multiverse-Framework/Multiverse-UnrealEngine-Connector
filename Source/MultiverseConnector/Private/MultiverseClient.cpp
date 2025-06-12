@@ -669,7 +669,10 @@ void FMultiverseClient::Init(const FString &ServerHost, const FString &ServerPor
 
 	connect();
 
-	StartTime = FPlatformTime::Seconds();
+	if (StartTime < 0.f)
+	{
+		StartTime = FPlatformTime::Seconds();
+	}
 }
 
 TMap<FString, FApiCallbacks> FMultiverseClient::CallApis(const TMap<FString, FApiCallbacks> &SimulationApiCallbacks)

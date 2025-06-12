@@ -50,10 +50,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAutoSendHandsAndHead = false;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<AActor*, FAttributeContainer> SendObjects;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<AActor*, FAttributeContainer> ReceiveObjects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -30,9 +30,10 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "Multiverse Client")
+	void Init() const;
+
+public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Multiverse Client")
 	UMultiverseClientComponent* MultiverseClientComponent;
-
-private:
-	void Init() const;
 };
