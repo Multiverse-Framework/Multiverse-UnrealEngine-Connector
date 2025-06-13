@@ -24,6 +24,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
 
 TMap<EAttribute, TArray<double>> AttributeDoubleDataMap =
 	{
+		{EAttribute::Scalar, {0.0}},
 		{EAttribute::Position, {0.0, 0.0, 0.0}},
 		{EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
 		{EAttribute::JointRvalue, {0.0}},
@@ -59,6 +60,7 @@ TMap<EAttribute, TArray<uint16_t>> AttributeUint16DataMap =
 
 const TMap<FString, EAttribute> AttributeStringMap =
 	{
+		{TEXT("scalar"), EAttribute::Scalar},
 		{TEXT("position"), EAttribute::Position},
 		{TEXT("quaternion"), EAttribute::Quaternion},
 		{TEXT("joint_rvalue"), EAttribute::JointRvalue},
