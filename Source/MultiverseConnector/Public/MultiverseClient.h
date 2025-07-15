@@ -38,6 +38,7 @@ enum class EAttribute : uint8
 	RGB_128_128,
 	RGB_3840_2160,
 	RGB_640_480,
+	RelativeVelocity
 };
 
 USTRUCT(Blueprintable)
