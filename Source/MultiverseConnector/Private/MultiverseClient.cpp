@@ -67,14 +67,14 @@ const TMap<FString, EAttribute> AttributeStringMap =
 		{TEXT("quaternion"), EAttribute::Quaternion},
 		{TEXT("linear_velocity"), EAttribute::LinearVelocity},
 		{TEXT("angular_velocity"), EAttribute::AngularVelocity},
-		{TEXT("joint_rvalue"), EAttribute::JointAngularPosition},
-		{TEXT("joint_tvalue"), EAttribute::JointLinearPosition},
+		{TEXT("joint_angular_position"), EAttribute::JointAngularPosition},
+		{TEXT("joint_linear_position"), EAttribute::JointLinearPosition},
 		{TEXT("joint_angular_velocity"), EAttribute::JointAngularVelocity},
 		{TEXT("joint_linear_velocity"), EAttribute::JointLinearVelocity},
 		{TEXT("joint_angular_acceleration"), EAttribute::JointAngularAcceleration},
 		{TEXT("joint_linear_acceleration"), EAttribute::JointLinearAcceleration},
-		{TEXT("cmd_joint_rvalue"), EAttribute::CmdJointAngularPosition},
-		{TEXT("cmd_joint_tvalue"), EAttribute::CmdJointLinearPosition},
+		{TEXT("cmd_joint_angular_position"), EAttribute::CmdJointAngularPosition},
+		{TEXT("cmd_joint_linear_position"), EAttribute::CmdJointLinearPosition},
 		{TEXT("cmd_joint_angular_velocity"), EAttribute::CmdJointAngularVelocity},
 		{TEXT("cmd_joint_linear_velocity"), EAttribute::CmdJointLinearVelocity},
 		{TEXT("cmd_joint_angular_acceleration"), EAttribute::CmdJointAngularAcceleration},
@@ -216,8 +216,8 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 	if (Object.Key->IsA(ASkeletalMeshActor::StaticClass()))
 	{
 		const FString ObjectName = Object.Value.ObjectPrefix + Object.Value.ObjectName + Object.Value.ObjectSuffix;
-		CachedActors.Add(ObjectName, Object.Key);
-		MetaDataJson->SetArrayField(ObjectName, AttributeJsonArray);
+		CachedActors.Add(Object.Value.ObjectName, Object.Key);
+		MetaDataJson->SetArrayField(Object.Value.ObjectName, AttributeJsonArray);
 
 		ASkeletalMeshActor *SkeletalMeshActor = Cast<ASkeletalMeshActor>(Object.Key);
 		if (USkeletalMeshComponent *SkeletalMeshComponent = SkeletalMeshActor->GetSkeletalMeshComponent())
@@ -230,12 +230,13 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 							   { return BoneNameB.ToString().Compare(BoneNameA.ToString()) > 0; });
 				for (const FName &BoneName : BoneNames)
 				{
-					FString BoneNameStr = Object.Value.ObjectPrefix + BoneName.ToString() + Object.Value.ObjectSuffix;
+					FString BoneNameStr = BoneName.ToString();
 					if (((BoneNameStr.EndsWith(TEXT("_revolute_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_revolute_bone"))) ||
 						 (BoneNameStr.EndsWith(TEXT("_continuous_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_continuous_bone")))) &&
 						Object.Value.Attributes.Contains(EAttribute::JointAngularPosition))
 					{
-						AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_rvalue")))};
+						BoneNameStr = Object.Value.ObjectPrefix + BoneNameStr + Object.Value.ObjectSuffix;
+						AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_angular_position")))};
 						if (!CachedBoneNames.Contains(BoneNameStr))
 						{
 							CachedBoneNames.Add(BoneNameStr, TMap<UMultiverseAnim *, FName>());
@@ -246,7 +247,8 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 					else if ((BoneNameStr.EndsWith(TEXT("_prismatic_bone")) && BoneNameStr.RemoveFromEnd(TEXT("_prismatic_bone"))) &&
 							 Object.Value.Attributes.Contains(EAttribute::JointLinearPosition))
 					{
-						AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_tvalue")))};
+						BoneNameStr = Object.Value.ObjectPrefix + BoneNameStr + Object.Value.ObjectSuffix;
+						AttributeJsonArray = {MakeShareable(new FJsonValueString(TEXT("joint_linear_position")))};
 						if (!CachedBoneNames.Contains(BoneNameStr))
 						{
 							CachedBoneNames.Add(BoneNameStr, TMap<UMultiverseAnim *, FName>());
@@ -348,8 +350,15 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
 			if (Attribute == EAttribute::Position ||
-				Attribute == EAttribute::Quaternion ||
-				Attribute == EAttribute::RGB_3840_2160 ||
+				Attribute == EAttribute::Quaternion)
+			{
+				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
+				if (!DataArray.Contains(NewData))
+				{
+					DataArray.Add(NewData);
+				}
+			}
+			else if (Attribute == EAttribute::RGB_3840_2160 ||
 				Attribute == EAttribute::RGB_1280_1024 ||
 				Attribute == EAttribute::RGB_640_480 ||
 				Attribute == EAttribute::RGB_128_128 ||
@@ -1562,20 +1571,20 @@ void FMultiverseClient::bind_receive_data()
 		}
 		else if (CachedBoneNames.Contains(ReceiveData.Key))
 		{
-			const double Jointvalue = *receive_buffer_double_addr++;
+			const double JointValue = *receive_buffer_double_addr++;
 			for (TPair<UMultiverseAnim *, FName> &BoneNameMapping : CachedBoneNames[ReceiveData.Key])
 			{
 				switch (ReceiveData.Value)
 				{
 				case EAttribute::JointAngularPosition:
 				{
-					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetRotation(FQuat(FRotator(Jointvalue, 0.f, 0.f)));
+					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetRotation(FQuat(FRotator(JointValue, 0.f, 0.f)));
 					break;
 				}
 
 				case EAttribute::JointLinearPosition:
 				{
-					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetTranslation(FVector(0.f, Jointvalue, 0.f));
+					BoneNameMapping.Key->JointPoses[BoneNameMapping.Value].SetTranslation(FVector(0.f, JointValue, 0.f));
 					break;
 				}
 
