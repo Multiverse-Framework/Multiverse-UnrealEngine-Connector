@@ -24,27 +24,29 @@ DEFINE_LOG_CATEGORY_STATIC(LogMultiverseClient, Log, All);
 
 TMap<EAttribute, TArray<double>> AttributeDoubleDataMap =
 	{
-		{EAttribute::Scalar, {0.0}},
+		{EAttribute::AngularVelocity, {0.0, 0.0, 0.0}},
+		{EAttribute::CmdJointAngularAcceleration, {0.0}},
+		{EAttribute::CmdJointAngularPosition, {0.0}},
+		{EAttribute::CmdJointAngularVelocity, {0.0}},
+		{EAttribute::CmdJointForce, {0.0}},
+		{EAttribute::CmdJointLinearAcceleration, {0.0}},
+		{EAttribute::CmdJointLinearPosition, {0.0}},
+		{EAttribute::CmdJointLinearVelocity, {0.0}},
+		{EAttribute::CmdJointTorque, {0.0}},
+		{EAttribute::Force, {0.0, 0.0, 0.0}},
+		{EAttribute::JointAngularAcceleration, {0.0}},
+		{EAttribute::JointAngularPosition, {0.0}},
+		{EAttribute::JointAngularVelocity, {0.0}},
+		{EAttribute::JointLinearAcceleration, {0.0}},
+		{EAttribute::JointLinearPosition, {0.0}},
+		{EAttribute::JointLinearVelocity, {0.0}},
+		{EAttribute::JointPosition, {0.0, 0.0, 0.0}},
+		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}},
+		{EAttribute::LinearVelocity, {0.0, 0.0, 0.0}},
 		{EAttribute::Position, {0.0, 0.0, 0.0}},
 		{EAttribute::Quaternion, {1.0, 0.0, 0.0, 0.0}},
-		{EAttribute::LinearVelocity, {0.0, 0.0, 0.0}},
-		{EAttribute::AngularVelocity, {0.0, 0.0, 0.0}},
-		{EAttribute::JointAngularPosition, {0.0}},
-		{EAttribute::JointLinearPosition, {0.0}},
-		{EAttribute::JointAngularVelocity, {0.0}},
-		{EAttribute::JointLinearVelocity, {0.0}},
-		{EAttribute::JointAngularAcceleration, {0.0}},
-		{EAttribute::JointLinearAcceleration, {0.0}},
-		{EAttribute::CmdJointAngularPosition, {0.0}},
-		{EAttribute::CmdJointLinearPosition, {0.0}},
-		{EAttribute::CmdJointAngularVelocity, {0.0}},
-		{EAttribute::CmdJointLinearVelocity, {0.0}},
-		{EAttribute::CmdJointAngularAcceleration, {0.0}},
-		{EAttribute::CmdJointLinearAcceleration, {0.0}},
-		{EAttribute::CmdJointTorque, {0.0}},
-		{EAttribute::CmdJointForce, {0.0}},
-		{EAttribute::JointPosition, {0.0, 0.0, 0.0}},
-		{EAttribute::JointQuaternion, {1.0, 0.0, 0.0, 0.0}}};
+		{EAttribute::Scalar, {0.0}},
+		{EAttribute::Torque, {0.0, 0.0, 0.0}}};
 
 TMap<EAttribute, TArray<uint8_t>> AttributeUint8DataMap =
 	{
@@ -62,35 +64,37 @@ TMap<EAttribute, TArray<uint16_t>> AttributeUint16DataMap =
 
 const TMap<FString, EAttribute> AttributeStringMap =
 	{
-		{TEXT("scalar"), EAttribute::Scalar},
-		{TEXT("position"), EAttribute::Position},
-		{TEXT("quaternion"), EAttribute::Quaternion},
-		{TEXT("linear_velocity"), EAttribute::LinearVelocity},
 		{TEXT("angular_velocity"), EAttribute::AngularVelocity},
-		{TEXT("joint_angular_position"), EAttribute::JointAngularPosition},
-		{TEXT("joint_linear_position"), EAttribute::JointLinearPosition},
-		{TEXT("joint_angular_velocity"), EAttribute::JointAngularVelocity},
-		{TEXT("joint_linear_velocity"), EAttribute::JointLinearVelocity},
-		{TEXT("joint_angular_acceleration"), EAttribute::JointAngularAcceleration},
-		{TEXT("joint_linear_acceleration"), EAttribute::JointLinearAcceleration},
-		{TEXT("cmd_joint_angular_position"), EAttribute::CmdJointAngularPosition},
-		{TEXT("cmd_joint_linear_position"), EAttribute::CmdJointLinearPosition},
-		{TEXT("cmd_joint_angular_velocity"), EAttribute::CmdJointAngularVelocity},
-		{TEXT("cmd_joint_linear_velocity"), EAttribute::CmdJointLinearVelocity},
 		{TEXT("cmd_joint_angular_acceleration"), EAttribute::CmdJointAngularAcceleration},
-		{TEXT("cmd_joint_linear_acceleration"), EAttribute::CmdJointLinearAcceleration},
-		{TEXT("cmd_joint_torque"), EAttribute::CmdJointTorque},
+		{TEXT("cmd_joint_angular_position"), EAttribute::CmdJointAngularPosition},
+		{TEXT("cmd_joint_angular_velocity"), EAttribute::CmdJointAngularVelocity},
 		{TEXT("cmd_joint_force"), EAttribute::CmdJointForce},
+		{TEXT("cmd_joint_linear_acceleration"), EAttribute::CmdJointLinearAcceleration},
+		{TEXT("cmd_joint_linear_position"), EAttribute::CmdJointLinearPosition},
+		{TEXT("cmd_joint_linear_velocity"), EAttribute::CmdJointLinearVelocity},
+		{TEXT("cmd_joint_torque"), EAttribute::CmdJointTorque},
+		{TEXT("depth_1280_1024"), EAttribute::Depth_1280_1024},
+		{TEXT("depth_128_128"), EAttribute::Depth_128_128},
+		{TEXT("depth_3840_2160"), EAttribute::Depth_3840_2160},
+		{TEXT("depth_640_480"), EAttribute::Depth_640_480},
+		{TEXT("force"), EAttribute::Force},
+		{TEXT("joint_angular_acceleration"), EAttribute::JointAngularAcceleration},
+		{TEXT("joint_angular_position"), EAttribute::JointAngularPosition},
+		{TEXT("joint_angular_velocity"), EAttribute::JointAngularVelocity},
+		{TEXT("joint_linear_acceleration"), EAttribute::JointLinearAcceleration},
+		{TEXT("joint_linear_position"), EAttribute::JointLinearPosition},
+		{TEXT("joint_linear_velocity"), EAttribute::JointLinearVelocity},
 		{TEXT("joint_position"), EAttribute::JointPosition},
 		{TEXT("joint_quaternion"), EAttribute::JointQuaternion},
-		{TEXT("rgb_3840_2160"), EAttribute::RGB_3840_2160},
+		{TEXT("linear_velocity"), EAttribute::LinearVelocity},
+		{TEXT("position"), EAttribute::Position},
+		{TEXT("quaternion"), EAttribute::Quaternion},
 		{TEXT("rgb_1280_1024"), EAttribute::RGB_1280_1024},
-		{TEXT("rgb_640_480"), EAttribute::RGB_640_480},
 		{TEXT("rgb_128_128"), EAttribute::RGB_128_128},
-		{TEXT("depth_3840_2160"), EAttribute::Depth_3840_2160},
-		{TEXT("depth_1280_1024"), EAttribute::Depth_1280_1024},
-		{TEXT("depth_640_480"), EAttribute::Depth_640_480},
-		{TEXT("depth_128_128"), EAttribute::Depth_128_128},};
+		{TEXT("rgb_3840_2160"), EAttribute::RGB_3840_2160},
+		{TEXT("rgb_640_480"), EAttribute::RGB_640_480},
+		{TEXT("scalar"), EAttribute::Scalar},
+		{TEXT("torque"), EAttribute::Torque}};
 
 UTextureRenderTarget2D *RenderTarget_RGBA8_3840_2160;
 UTextureRenderTarget2D *RenderTarget_RGBA8_1280_1024;
@@ -117,10 +121,11 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 			switch (Attribute)
 			{
 			case EAttribute::Position:
-				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
-				break;
-
 			case EAttribute::Quaternion:
+			case EAttribute::LinearVelocity:
+			case EAttribute::AngularVelocity:
+			case EAttribute::Force:
+			case EAttribute::Torque:
 				AttributeJsonArray.Add(MakeShareable(new FJsonValueString(AttributeName)));
 				break;
 
@@ -475,7 +480,7 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		{
 			for (const EAttribute &Attribute : Object.Value.Attributes)
 			{
-				if (Attribute == EAttribute::Position || Attribute == EAttribute::Quaternion)
+				if (Attribute == EAttribute::Position || Attribute == EAttribute::Quaternion || Attribute == EAttribute::LinearVelocity || Attribute == EAttribute::AngularVelocity || Attribute == EAttribute::Force || Attribute == EAttribute::Torque)
 				{
 					TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
 					if (!DataArray.Contains(NewData))
@@ -1123,6 +1128,46 @@ void FMultiverseClient::bind_response_meta_data()
 				break;
 			}
 
+			case EAttribute::LinearVelocity:
+			{
+				if (!ResponseSendObjects->HasField(AttributeName))
+				{
+					continue;
+				}
+
+				TArray<TSharedPtr<FJsonValue>> ObjectLinearVelocity = ResponseSendObjects->GetArrayField(AttributeName);
+				if (ObjectLinearVelocity.Num() != 3)
+				{
+					continue;
+				}
+
+				const double VelLinX = ObjectLinearVelocity[0]->AsNumber();
+				const double VelLinY = ObjectLinearVelocity[1]->AsNumber();
+				const double VelLinZ = ObjectLinearVelocity[2]->AsNumber();
+				Cast<UPrimitiveComponent>(CachedActors[SendData.Key]->GetRootComponent())->SetPhysicsLinearVelocity(FVector(VelLinX, VelLinY, VelLinZ));
+				break;
+			}
+
+			case EAttribute::AngularVelocity:
+			{
+				if (!ResponseSendObjects->HasField(AttributeName))
+				{
+					continue;
+				}
+
+				TArray<TSharedPtr<FJsonValue>> ObjectAngularVelocity = ResponseSendObjects->GetArrayField(AttributeName);
+				if (ObjectAngularVelocity.Num() != 3)
+				{
+					continue;
+				}
+
+				const double VelAngX = ObjectAngularVelocity[0]->AsNumber();
+				const double VelAngY = ObjectAngularVelocity[1]->AsNumber();
+				const double VelAngZ = ObjectAngularVelocity[2]->AsNumber();
+				Cast<UPrimitiveComponent>(CachedActors[SendData.Key]->GetRootComponent())->SetPhysicsAngularVelocityInDegrees(FVector(VelAngX, VelAngY, VelAngZ));
+				break;
+			}
+
 			default:
 				break;
 			}
@@ -1340,6 +1385,24 @@ void FMultiverseClient::bind_send_data()
 					*send_buffer_double_addr++ = ActorQuat.X;
 					*send_buffer_double_addr++ = ActorQuat.Y;
 					*send_buffer_double_addr++ = ActorQuat.Z;
+					break;
+				}
+
+				case EAttribute::LinearVelocity:
+				{
+					const FVector ActorLinearVelocity = Cast<UPrimitiveComponent>(CachedActors[SendData.Key]->GetRootComponent())->GetPhysicsLinearVelocity();
+					*send_buffer_double_addr++ = ActorLinearVelocity.X;
+					*send_buffer_double_addr++ = ActorLinearVelocity.Y;
+					*send_buffer_double_addr++ = ActorLinearVelocity.Z;
+					break;
+				}
+
+				case EAttribute::AngularVelocity:
+				{
+					const FVector ActorAngularVelocity = Cast<UPrimitiveComponent>(CachedActors[SendData.Key]->GetRootComponent())->GetPhysicsAngularVelocityInDegrees();
+					*send_buffer_double_addr++ = ActorAngularVelocity.X;
+					*send_buffer_double_addr++ = ActorAngularVelocity.Y;
+					*send_buffer_double_addr++ = ActorAngularVelocity.Z;
 					break;
 				}
 
@@ -1562,6 +1625,42 @@ void FMultiverseClient::bind_receive_data()
 				const double Y = *receive_buffer_double_addr++;
 				const double Z = *receive_buffer_double_addr++;
 				CachedActors[ReceiveData.Key]->SetActorRotation(FQuat(X, Y, Z, W));
+				break;
+			}
+
+			case EAttribute::LinearVelocity:
+			{
+				const double VelLinX = *receive_buffer_double_addr++;
+				const double VelLinY = *receive_buffer_double_addr++;
+				const double VelLinZ = *receive_buffer_double_addr++;
+				Cast<UPrimitiveComponent>(CachedActors[ReceiveData.Key]->GetRootComponent())->SetPhysicsLinearVelocity(FVector(VelLinX, VelLinY, VelLinZ));
+				break;
+			}
+
+			case EAttribute::AngularVelocity:
+			{
+				const double VelAngX = *receive_buffer_double_addr++;
+				const double VelAngY = *receive_buffer_double_addr++;
+				const double VelAngZ = *receive_buffer_double_addr++;
+				Cast<UPrimitiveComponent>(CachedActors[ReceiveData.Key]->GetRootComponent())->SetPhysicsAngularVelocityInDegrees(FVector(VelAngX, VelAngY, VelAngZ));
+				break;
+			}
+
+			case EAttribute::Force:
+			{
+				const double ForceX = *receive_buffer_double_addr++;
+				const double ForceY = *receive_buffer_double_addr++;
+				const double ForceZ = *receive_buffer_double_addr++;
+				Cast<UPrimitiveComponent>(CachedActors[ReceiveData.Key]->GetRootComponent())->AddForce(FVector(ForceX, ForceY, ForceZ));
+				break;
+			}
+
+			case EAttribute::Torque:
+			{
+				const double TorqueX = *receive_buffer_double_addr++;
+				const double TorqueY = *receive_buffer_double_addr++;
+				const double TorqueZ = *receive_buffer_double_addr++;
+				Cast<UPrimitiveComponent>(CachedActors[ReceiveData.Key]->GetRootComponent())->AddTorqueInRadians(FVector(TorqueX, TorqueY, TorqueZ));
 				break;
 			}
 
