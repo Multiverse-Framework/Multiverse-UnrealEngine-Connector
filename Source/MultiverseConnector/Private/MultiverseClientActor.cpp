@@ -75,6 +75,14 @@ void AMultiverseClientActor::Init() const
 		AttributeContainer.ObjectName = TEXT("PlayerPawn");
 		AttributeContainer.Attributes.Add(EAttribute::Position);
 		AttributeContainer.Attributes.Add(EAttribute::Quaternion);
+		if (Tags.Num() >= 1)
+		{
+			AttributeContainer.ObjectPrefix = Tags[0].ToString();
+		}
+		if (Tags.Num() >= 2)
+		{
+			AttributeContainer.ObjectSuffix = Tags[1].ToString();
+		}
 		MultiverseClientComponent->SendObjects.Add(PlayerPawn, AttributeContainer);
 	}
 

@@ -292,7 +292,7 @@ static void BindMetaData(const TSharedPtr<FJsonObject> &MetaDataJson,
 
 			for (TPair<EOculusXRBone, FName> &BoneNameMapping : Cast<UOculusXRHandComponent>(ActorComponents[0])->BoneNameMappings)
 			{
-				const FString BoneNameStr = Tag + TEXT("_") + UEnum::GetDisplayValueAsText(BoneNameMapping.Key).ToString().Replace(TEXT(" "), TEXT(""));
+				const FString BoneNameStr = Object.Value.ObjectPrefix + Tag + TEXT("_") + UEnum::GetDisplayValueAsText(BoneNameMapping.Key).ToString().Replace(TEXT(" "), TEXT("")) + Object.Value.ObjectSuffix;
 				BoneNameMapping.Value = *BoneNameStr;
 				TArray<TSharedPtr<FJsonValue>> FingerAttributeJsonArray;
 				for (const EAttribute &Attribute : Object.Value.Attributes)
