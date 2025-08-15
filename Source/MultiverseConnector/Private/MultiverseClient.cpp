@@ -355,7 +355,11 @@ static void BindDataArray(TArray<TPair<FString, EAttribute>> &DataArray,
 		for (const EAttribute &Attribute : Object.Value.Attributes)
 		{
 			if (Attribute == EAttribute::Position ||
-				Attribute == EAttribute::Quaternion)
+				Attribute == EAttribute::Quaternion ||
+				Attribute == EAttribute::LinearVelocity ||
+				Attribute == EAttribute::AngularVelocity ||
+				Attribute == EAttribute::Force ||
+				Attribute == EAttribute::Torque)
 			{
 				const TPair<FString, EAttribute> NewData(Object.Value.ObjectName, Attribute);
 				if (!DataArray.Contains(NewData))
@@ -930,7 +934,7 @@ bool FMultiverseClient::init_objects(bool from_request_meta_data)
 		return false;
 	}
 
-	return SendObjects.Num() > 0 || ReceiveObjects.Num() > 0;
+	return SendObjects.Num() > 0 || ReceiveObjects.Num() > 0 || SendCustomObjectsPtr && SendCustomObjectsPtr->Num() > 0 || ReceiveCustomObjectsPtr && ReceiveCustomObjectsPtr->Num();
 }
 
 void FMultiverseClient::start_connect_to_server_thread()
