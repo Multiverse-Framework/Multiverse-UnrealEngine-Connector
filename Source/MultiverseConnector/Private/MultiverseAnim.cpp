@@ -15,7 +15,8 @@ void UMultiverseAnim::NativeBeginPlay()
 		if (BoneName.ToString().EndsWith(TEXT("continuous_bone"), ESearchCase::CaseSensitive) ||
 			BoneName.ToString().EndsWith(TEXT("prismatic_bone"), ESearchCase::CaseSensitive) ||
 			BoneName.ToString().EndsWith(TEXT("revolute_bone"), ESearchCase::CaseSensitive) ||
-			BoneName.ToString().EndsWith(TEXT("ball_bone"), ESearchCase::CaseSensitive))
+			BoneName.ToString().EndsWith(TEXT("ball_bone"), ESearchCase::CaseSensitive) ||
+			BoneName.ToString().StartsWith(TEXT("vertex_"), ESearchCase::CaseSensitive))
 		{
 			JointPoses.Add(BoneName);
 		}

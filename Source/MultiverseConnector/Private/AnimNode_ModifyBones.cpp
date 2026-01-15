@@ -57,7 +57,8 @@ void FAnimNode_ModifyBones::InitializeBoneReferences(const FBoneContainer& Requi
 			BoneName.ToString().EndsWith(TEXT("_continuous_bone"), ESearchCase::CaseSensitive) ||
 			BoneName.ToString().EndsWith(TEXT("_prismatic_bone"), ESearchCase::CaseSensitive) ||
 			BoneName.ToString().EndsWith(TEXT("_revolute_bone"), ESearchCase::CaseSensitive) ||
-			BoneName.ToString().EndsWith(TEXT("_ball_bone"), ESearchCase::CaseSensitive))
+			BoneName.ToString().EndsWith(TEXT("_ball_bone"), ESearchCase::CaseSensitive) ||
+			BoneName.ToString().StartsWith(TEXT("vertex_"), ESearchCase::CaseSensitive))
 		{
 			if (FBoneReference BoneToModify(BoneName); !BonesToModify.Contains(BoneToModify))
 			{
